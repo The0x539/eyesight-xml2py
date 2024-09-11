@@ -1,4 +1,4 @@
-use quote::ToTokens;
+use quote::quote;
 use syn::{parse_quote, Expr, Field, Fields, FieldsNamed, ItemStruct, Lit, Meta, Type};
 
 #[proc_macro_attribute]
@@ -19,7 +19,40 @@ pub fn node(
         process_fields(fields);
     }
 
-    item.into_token_stream().into()
+    let name = &item.ident;
+
+    let inode_impl = _attr
+        .into_iter()
+        .next()
+        .and_then(|token| match token {
+            proc_macro::TokenTree::Ident(ident) => Some(ident),
+            _ => None,
+        })
+        .map(|ident| {
+            let python_type = ident.to_string();
+            quote! {
+                impl crate::nodes::INode for #name {
+                    const PYTHON_TYPE: &str = #python_type;
+                }
+            }
+        });
+
+    quote! {
+        #item
+
+        impl crate::schema::Named for #name {
+            fn name(&self) -> &str {
+                &self.name
+            }
+
+            fn name_mut(&mut self) -> &mut String {
+                &mut self.name
+            }
+        }
+
+        #inode_impl
+    }
+    .into()
 }
 
 fn process_fields(fields: &mut FieldsNamed) {

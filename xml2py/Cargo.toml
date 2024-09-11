@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+heck = "0.5.0"
+phf = { version = "0.11.2", features = ["macros"] }
 quick-xml = { version = "0.36.1", features = ["serialize", "overlapped-lists"] }
 serde = "1.0.210"
 serde_derive = "1.0.210"

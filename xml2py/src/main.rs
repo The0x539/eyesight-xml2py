@@ -1,12 +1,19 @@
 #[macro_use]
-mod nodes;
+pub mod nodes;
+
 mod schema;
 
-mod distill;
-mod groups;
+pub mod distill;
+pub mod groups;
+
+mod codegen;
+
+mod lookups;
 
 use std::collections::BTreeMap;
 
+use heck::{ToPascalCase, ToSnakeCase, ToTrainCase};
+use nodes::Node;
 use schema::{Eyesight, Named};
 
 const SETTINGS_XML: &str =
@@ -17,10 +24,57 @@ const CUSTOM_XML: &str =
 fn main() {
     let eyesight_main = quick_xml::de::from_str::<schema::Eyesight>(SETTINGS_XML).unwrap();
     let eyesight_custom = quick_xml::de::from_str::<schema::Eyesight>(CUSTOM_XML).unwrap();
-    let eyesight = merge_eyesight(eyesight_main, eyesight_custom);
+    let mut eyesight = merge_eyesight(eyesight_main, eyesight_custom);
 
-    groups::check_interfaces(&eyesight);
-    distill::distill_materials(&eyesight.materials);
+    beautify_names(&mut eyesight);
+
+    let s = codegen::the_big_kahuna(&eyesight);
+    println!("{s}");
+
+    // groups::check_interfaces(&eyesight);
+    // distill::distill_materials(&eyesight.materials);
+}
+
+fn beautify_names(eyesight: &mut Eyesight) {
+    for group in &mut eyesight.groups {
+        let pascal_name = group.name.to_pascal_case();
+
+        for node in &mut group.shader.nodes {
+            beautify_node_name(node.name_mut(), &pascal_name);
+            if let Node::Group(g) = node {
+                beautify_group_name(&mut g.group_name);
+            }
+        }
+
+        for link in &mut group.shader.links {
+            beautify_node_name(&mut link.from_node, &pascal_name);
+            beautify_node_name(&mut link.to_node, &pascal_name);
+        }
+
+        beautify_group_name(&mut group.name);
+    }
+
+    for material in &mut eyesight.materials {
+        for node in &mut material.shader.nodes {
+            if let Node::Group(g) = node {
+                beautify_group_name(&mut g.group_name);
+            }
+        }
+    }
+}
+
+fn beautify_node_name(name: &mut String, group_name: &str) {
+    *name = name
+        .replace("Anique", "Antique")
+        .trim_start_matches(group_name)
+        .to_snake_case();
+}
+
+fn beautify_group_name(name: &mut String) {
+    *name = name
+        .trim_end_matches("-GROUP")
+        .to_train_case()
+        .replace("-", " ");
 }
 
 fn merge<T: Named + PartialEq + std::fmt::Debug>(a: Vec<T>, b: Vec<T>) -> Vec<T> {

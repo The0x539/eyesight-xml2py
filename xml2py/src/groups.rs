@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    nodes::{GroupReference, Node, NodeInputType},
+    nodes::{GroupReference, Node, SocketType},
     schema::{Eyesight, Group},
 };
 
-pub fn check_interfaces(eyesight: &Eyesight) {
+pub fn check_interfaces(eyesight: &Eyesight) -> HashMap<String, Interface> {
     let mut interfaces = eyesight
         .groups
         .iter()
@@ -23,21 +23,30 @@ pub fn check_interfaces(eyesight: &Eyesight) {
         }
     }
 
-    for (name, interface) in &interfaces {
-        if unused_groups.contains(name) {
+    let mut complete = HashMap::new();
+
+    for (name, incomplete) in interfaces {
+        if unused_groups.contains(&name) {
             continue;
         }
-        for input in &interface.inputs {
-            assert!(input.1.is_some());
+
+        let mut interface = Interface::default();
+        for (socket_name, data_type) in incomplete.inputs {
+            let data_type = data_type.unwrap_or_else(|| panic!("{name} / {socket_name}"));
+            interface.inputs.insert(socket_name, data_type);
         }
-        for input in &interface.outputs {
-            assert!(input.1.is_some());
+        for (socket_name, data_type) in incomplete.outputs {
+            let data_type = data_type.unwrap_or_else(|| panic!("{name} / {socket_name}"));
+            interface.outputs.insert(socket_name, data_type);
         }
+        complete.insert(name, interface);
     }
+
+    complete
 }
 
-fn discover_sockets(group: &Group) -> Interface {
-    let mut interface = Interface::default();
+fn discover_sockets(group: &Group) -> IncompleteInterface {
+    let mut interface = IncompleteInterface::default();
 
     let mut input_node_name = None;
     let mut output_node_name = None;
@@ -60,7 +69,10 @@ fn discover_sockets(group: &Group) -> Interface {
     interface
 }
 
-fn check_socket_types(node: &GroupReference, interfaces: &mut HashMap<String, Interface>) {
+fn check_socket_types(
+    node: &GroupReference,
+    interfaces: &mut HashMap<String, IncompleteInterface>,
+) {
     let interface = interfaces.get_mut(&node.group_name).unwrap();
 
     for input in &node.inputs {
@@ -73,9 +85,9 @@ fn check_socket_types(node: &GroupReference, interfaces: &mut HashMap<String, In
 }
 
 fn check_socket_type(
-    sockets: &mut HashMap<String, Option<NodeInputType>>,
+    sockets: &mut HashMap<String, Option<SocketType>>,
     name: &str,
-    usage_type: NodeInputType,
+    usage_type: SocketType,
 ) {
     let data_type = sockets.entry(name.into()).or_insert_with(|| {
         println!("unknown socket: {name} {usage_type:?}");
@@ -89,7 +101,13 @@ fn check_socket_type(
 }
 
 #[derive(Default, Debug)]
-struct Interface {
-    inputs: HashMap<String, Option<NodeInputType>>,
-    outputs: HashMap<String, Option<NodeInputType>>,
+struct IncompleteInterface {
+    inputs: HashMap<String, Option<SocketType>>,
+    outputs: HashMap<String, Option<SocketType>>,
+}
+
+#[derive(Default, Debug)]
+pub struct Interface {
+    pub inputs: HashMap<String, SocketType>,
+    pub outputs: HashMap<String, SocketType>,
 }

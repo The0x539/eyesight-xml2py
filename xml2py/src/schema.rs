@@ -3,6 +3,7 @@ use xml2py_macros::node;
 
 pub trait Named {
     fn name(&self) -> &str;
+    fn name_mut(&mut self) -> &mut String;
 }
 
 #[derive(Deserialize, Debug)]
@@ -25,10 +26,8 @@ impl Named for Group {
     fn name(&self) -> &str {
         &self.name
     }
-}
-impl Named for Material {
-    fn name(&self) -> &str {
-        &self.name
+    fn name_mut(&mut self) -> &mut String {
+        &mut self.name
     }
 }
 
