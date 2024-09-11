@@ -12,7 +12,7 @@ mod lookups;
 
 use std::collections::BTreeMap;
 
-use heck::{ToPascalCase, ToSnakeCase, ToTrainCase};
+use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
 use nodes::Node;
 use schema::{Eyesight, Named};
 
@@ -40,15 +40,15 @@ fn beautify_names(eyesight: &mut Eyesight) {
         let pascal_name = group.name.to_pascal_case();
 
         for node in &mut group.shader.nodes {
-            beautify_node_name(node.name_mut(), &pascal_name);
+            beautify_node_name(node.name_mut(), &group.name, &pascal_name);
             if let Node::Group(g) = node {
                 beautify_group_name(&mut g.group_name);
             }
         }
 
         for link in &mut group.shader.links {
-            beautify_node_name(&mut link.from_node, &pascal_name);
-            beautify_node_name(&mut link.to_node, &pascal_name);
+            beautify_node_name(&mut link.from_node, &group.name, &pascal_name);
+            beautify_node_name(&mut link.to_node, &group.name, &pascal_name);
         }
 
         beautify_group_name(&mut group.name);
@@ -60,21 +60,31 @@ fn beautify_names(eyesight: &mut Eyesight) {
                 beautify_group_name(&mut g.group_name);
             }
         }
+
+        beautify_material_name(&mut material.name)
     }
 }
 
-fn beautify_node_name(name: &mut String, group_name: &str) {
+fn beautify_node_name(name: &mut String, original_group_name: &str, pascal_group_name: &str) {
     *name = name
         .replace("Anique", "Antique")
-        .trim_start_matches(group_name)
+        .trim_start_matches(original_group_name)
+        .trim_start_matches(pascal_group_name)
         .to_snake_case();
 }
 
 fn beautify_group_name(name: &mut String) {
     *name = name
         .trim_end_matches("-GROUP")
-        .to_train_case()
-        .replace("-", " ");
+        .trim_end_matches("Group")
+        .to_title_case()
+}
+
+fn beautify_material_name(name: &mut String) {
+    *name = name
+        .to_title_case()
+        .replace("Trans Trans", "Trans")
+        .replace("Trans ", "Trans-")
 }
 
 fn merge<T: Named + PartialEq + std::fmt::Debug>(a: Vec<T>, b: Vec<T>) -> Vec<T> {

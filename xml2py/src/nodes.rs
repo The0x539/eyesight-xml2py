@@ -14,6 +14,9 @@ pub trait INode: Named {
     fn python_type(&self) -> &'static str {
         Self::PYTHON_TYPE
     }
+    fn inputs(&self) -> &[NodeInput] {
+        &[]
+    }
 }
 
 #[node]
@@ -263,7 +266,9 @@ struct GroupReferenceOutput {
 #[node(ShaderNodeGroup)]
 struct GroupReference {
     group_name: String,
-    inputs: Vec<GroupReferenceInput>,
+    #[serde(default)]
+    #[rename = "input"] // another workaround
+    inputs_: Vec<GroupReferenceInput>,
     outputs: Vec<GroupReferenceOutput>,
 }
 
@@ -519,6 +524,12 @@ macro_rules! nodes {
                 match self {
                     Self::Group(x) => x.python_type(),
                     $(Self::$ty(x) => x.python_type(),)*
+                }
+            }
+            fn inputs(&self) -> &[NodeInput] {
+                match self {
+                    Self::Group(x) => x.inputs(),
+                    $(Self::$ty(x) => x.inputs(),)*
                 }
             }
         }

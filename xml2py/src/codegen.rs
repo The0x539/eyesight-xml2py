@@ -2,15 +2,20 @@ use std::collections::BTreeMap;
 
 use crate::groups::Interface;
 use crate::lookups::INPUT_ALIASES;
-use crate::nodes::{INode, Node};
+use crate::nodes::{INode, Node, NodeInputValue, Vec3};
 use crate::schema::{Eyesight, Group, Link, Named};
 
 pub fn the_big_kahuna(eyesight: &Eyesight) -> String {
     let interfaces = crate::groups::check_interfaces(eyesight);
 
-    let solid_group = eyesight.groups.iter().find(|g| g.name == "Solid").unwrap();
+    println!(
+        "{:?}",
+        eyesight.groups.iter().map(|g| &g.name).collect::<Vec<_>>()
+    );
 
-    let solid_group_interface = &interfaces["Solid"];
+    let solid_group = eyesight.groups.iter().find(|g| g.name == "Uv").unwrap();
+
+    let solid_group_interface = &interfaces["Uv"];
 
     let lines = groupp(solid_group, solid_group_interface);
     lines.join("\n")
@@ -36,43 +41,69 @@ fn groupp(group: &Group, _interface: &Interface) -> Vec<String> {
         inbound_edges.entry(&link.to_node).or_default().push(link);
     }
 
-    let mut x = 0;
-    for tier in tiers {
-        let mut y = 0;
-        for node in tier {
-            let var_name = node.name();
-            let type_name = node.python_type();
+    let x_coordinates = (0..).step_by(100);
+    let y_coordinates = (0..).step_by(200);
 
-            lines.extend([
-                format!("{var_name} = graph.node("),
-                format!("    bpy.types.{type_name},"),
-                format!("    location=({x}, {y}),"),
-            ]);
+    let node_iterator = tiers.iter().zip(x_coordinates).flat_map(|(tier, x)| {
+        tier.iter()
+            .zip(std::iter::repeat(x))
+            .zip(y_coordinates.clone())
+    });
 
-            if let Some(links) = inbound_edges.get(&var_name) {
-                lines.push("    inputs={".into());
-                for link in links {
-                    let mut dst_socket = &*link.to_socket;
-                    if let Some(alias) =
-                        INPUT_ALIASES.get(type_name).and_then(|m| m.get(dst_socket))
-                    {
-                        dst_socket = alias;
-                    }
+    for ((node, x), y) in node_iterator {
+        let var_name = node.name();
+        let type_name = node.python_type();
 
-                    let src_node = &link.from_node;
-                    let src_socket = &link.from_socket;
-                    lines.push(format!(
-                        "        \"{dst_socket}\": {src_node}[\"{src_socket}\"],"
-                    ));
+        lines.extend([
+            format!("{var_name} = graph.node("),
+            format!("    bpy.types.{type_name},"),
+            format!("    location=({x}, {y}),"),
+        ]);
+
+        let mut inputs = Vec::<(String, String)>::new();
+
+        for link in inbound_edges
+            .get(&var_name)
+            .map(|x| &**x)
+            .unwrap_or_default()
+        {
+            let src_node = &link.from_node;
+            let src_socket = &link.from_socket;
+            inputs.push((
+                link.to_socket.clone(),
+                format!("{src_node}[\"{src_socket}\"]"),
+            ))
+        }
+
+        for input in node.inputs() {
+            // TODO: move to the type
+            let value = match input.value {
+                NodeInputValue::Float(n) => format!("{n}"),
+                NodeInputValue::Vector(Vec3([x, y, z])) => format!("({x}, {y}, {z})"),
+                NodeInputValue::Int(n) => format!("{n}"),
+                NodeInputValue::Color(Vec3([r, g, b])) => format!("({r}, {g}, {b})"),
+                NodeInputValue::Boolean(b) => if b { "True" } else { "False" }.into(),
+            };
+            inputs.push((input.name.clone(), value));
+        }
+
+        if !inputs.is_empty() {
+            lines.push("    inputs={".into());
+
+            for (dst_socket, value) in inputs {
+                let mut dst_socket = &*dst_socket;
+                if let Some(alias) = INPUT_ALIASES.get(type_name).and_then(|m| m.get(dst_socket)) {
+                    dst_socket = alias;
                 }
-                lines.push("    },".into());
+
+                lines.push(format!("        \"{dst_socket}\": {value},"));
             }
 
-            lines.extend([format!(")"), format!("")]);
-
-            y += 200;
+            lines.push("    },".into());
         }
-        x += 100;
+
+        lines.push(")".into());
+        lines.push("".into());
     }
 
     lines

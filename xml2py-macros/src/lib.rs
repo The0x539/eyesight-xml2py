@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{parse_quote, Expr, Field, Fields, FieldsNamed, ItemStruct, Lit, Meta, Type};
+use syn::{parse_quote, Expr, Field, Fields, FieldsNamed, ItemStruct, Lit, Member, Meta, Type};
 
 #[proc_macro_attribute]
 pub fn node(
@@ -29,10 +29,21 @@ pub fn node(
             _ => None,
         })
         .map(|ident| {
+            let fn_inputs = item
+                .fields
+                .members()
+                .any(|m| matches!(m, Member::Named(n) if n == "inputs"))
+                .then(|| {
+                    quote! {
+                        fn inputs(&self) -> &[NodeInput] { &self.inputs }
+                    }
+                });
+
             let python_type = ident.to_string();
             quote! {
                 impl crate::nodes::INode for #name {
                     const PYTHON_TYPE: &str = #python_type;
+                    #fn_inputs
                 }
             }
         });

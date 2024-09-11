@@ -69,7 +69,7 @@ fn without_color(mut material: Material) -> Material {
                 &*group_node.group_name,
                 "PEARL-GROUP" | "PEARL-FLAT-GROUP" | "SATIN-GROUP"
             ) {
-                for input in &mut group_node.inputs {
+                for input in &mut group_node.inputs_ {
                     input.value = Some(NodeInputValue::Float(0.0));
                 }
             }

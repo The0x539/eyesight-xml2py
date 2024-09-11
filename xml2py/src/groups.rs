@@ -75,7 +75,7 @@ fn check_socket_types(
 ) {
     let interface = interfaces.get_mut(&node.group_name).unwrap();
 
-    for input in &node.inputs {
+    for input in &node.inputs_ {
         check_socket_type(&mut interface.inputs, &input.name, input.data_type);
     }
 
@@ -90,7 +90,7 @@ fn check_socket_type(
     usage_type: SocketType,
 ) {
     let data_type = sockets.entry(name.into()).or_insert_with(|| {
-        println!("unknown socket: {name} {usage_type:?}");
+        // println!("unknown socket: {name} {usage_type:?}");
         None
     });
 
