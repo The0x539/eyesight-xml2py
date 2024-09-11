@@ -1,0 +1,13 @@
+[package]
+name = "xml2py"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quick-xml = { version = "0.36.1", features = ["serialize", "overlapped-lists"] }
+serde = "1.0.210"
+serde_derive = "1.0.210"
+serde_with = "3.9.0"
+with_builtin_macros = "0.1.0"
+
+xml2py-macros = { path = "../xml2py-macros" }

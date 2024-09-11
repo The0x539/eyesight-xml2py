@@ -1,0 +1,3 @@
+[workspace]
+members = ["xml2py", "xml2py-macros"]
+resolver = "2"
