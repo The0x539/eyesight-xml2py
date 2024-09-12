@@ -1,27 +1,38 @@
 use std::collections::BTreeMap;
 
+use heck::AsSnakeCase;
+
 use crate::groups::Interface;
 use crate::lookups::INPUT_ALIASES;
-use crate::nodes::{INode, Node, NodeInputValue, Vec3};
+use crate::nodes::{INode, Node};
 use crate::schema::{Eyesight, Group, Link, Named};
 
 pub fn the_big_kahuna(eyesight: &Eyesight) -> String {
     let interfaces = crate::groups::check_interfaces(eyesight);
 
-    println!(
-        "{:?}",
-        eyesight.groups.iter().map(|g| &g.name).collect::<Vec<_>>()
-    );
+    let mut file = String::new();
 
-    let solid_group = eyesight.groups.iter().find(|g| g.name == "Uv").unwrap();
+    for group in &eyesight.groups {
+        let Some(interface) = interfaces.get(&group.name) else {
+            continue;
+        };
 
-    let solid_group_interface = &interfaces["Uv"];
+        let function_body = group_to_python(group, interface);
 
-    let lines = groupp(solid_group, solid_group_interface);
-    lines.join("\n")
+        file += &format!("def node_group_{}():\n", AsSnakeCase(&group.name));
+
+        for line in function_body {
+            file += "    ";
+            file += &line;
+            file += "\n";
+        }
+        file += "\n\n";
+    }
+
+    file
 }
 
-fn groupp(group: &Group, _interface: &Interface) -> Vec<String> {
+fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
     let mut lines = vec![];
 
     let group_name = &group.name;
@@ -33,6 +44,21 @@ fn groupp(group: &Group, _interface: &Interface) -> Vec<String> {
         format!("graph = NodeGraph(tree)"),
         format!(""),
     ]);
+
+    for (name, data_type) in &interface.inputs {
+        lines.push(format!(
+            "graph.input(bpy.types.{}, \"{name}\")",
+            data_type.python_type()
+        ));
+    }
+    for (name, data_type) in &interface.outputs {
+        lines.push(format!(
+            "graph.output(bpy.types.{}, \"{name}\")",
+            data_type.python_type()
+        ));
+    }
+
+    lines.push("".into());
 
     let tiers = topographic_sort(&group.shader.nodes, &group.shader.links);
 
@@ -76,15 +102,7 @@ fn groupp(group: &Group, _interface: &Interface) -> Vec<String> {
         }
 
         for input in node.inputs() {
-            // TODO: move to the type
-            let value = match input.value {
-                NodeInputValue::Float(n) => format!("{n}"),
-                NodeInputValue::Vector(Vec3([x, y, z])) => format!("({x}, {y}, {z})"),
-                NodeInputValue::Int(n) => format!("{n}"),
-                NodeInputValue::Color(Vec3([r, g, b])) => format!("({r}, {g}, {b})"),
-                NodeInputValue::Boolean(b) => if b { "True" } else { "False" }.into(),
-            };
-            inputs.push((input.name.clone(), value));
+            inputs.push((input.name.clone(), input.value.to_string()));
         }
 
         if !inputs.is_empty() {
@@ -105,6 +123,8 @@ fn groupp(group: &Group, _interface: &Interface) -> Vec<String> {
         lines.push(")".into());
         lines.push("".into());
     }
+
+    lines.push("return graph.tree".into());
 
     lines
 }

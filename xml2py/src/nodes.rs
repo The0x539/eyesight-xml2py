@@ -21,6 +21,7 @@ pub trait INode: Named {
 
 #[node]
 struct NodeInput {
+    name: String,
     #[serde(flatten)]
     value: NodeInputValue,
 }
@@ -34,6 +35,18 @@ pub enum NodeInputValue {
     Int(#[serde_as(as = "DisplayFromStr")] u32),
     Color(Vec3),
     Boolean(#[serde(deserialize_with = "py_bool")] bool),
+}
+
+impl std::fmt::Display for NodeInputValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Float(n) => write!(f, "{n}"),
+            Self::Vector(Vec3([x, y, z])) => write!(f, "({x}, {y}, {z})"),
+            Self::Int(n) => write!(f, "{n}"),
+            Self::Color(Vec3([r, g, b])) => write!(f, "({r}, {g}, {b})"),
+            Self::Boolean(b) => f.write_str(if *b { "True" } else { "False" }),
+        }
+    }
 }
 
 impl SocketType {

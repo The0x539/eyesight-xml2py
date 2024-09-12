@@ -67,7 +67,9 @@ fn beautify_names(eyesight: &mut Eyesight) {
 
 fn beautify_node_name(name: &mut String, original_group_name: &str, pascal_group_name: &str) {
     *name = name
+        .replace("Anitique", "Antique")
         .replace("Anique", "Antique")
+        .replace("Ghrome", "Chrome")
         .trim_start_matches(original_group_name)
         .trim_start_matches(pascal_group_name)
         .to_snake_case();
