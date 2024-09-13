@@ -34,9 +34,9 @@ CREATE TABLE ldraw_secondary_material (
         CHECK (volume_fraction BETWEEN 0.0 AND 1.0),
     size INTEGER NULL
         CHECK (size > 0),
-    min_size NUMERIC NULL
+    min_size REAL NULL
         CHECK (min_size > 0),
-    max_size NUMERIC NULL
+    max_size REAL NULL
         CHECK (max_size > min_size),
 
     CHECK ((min_size IS NULL) == (max_size IS NULL)),
