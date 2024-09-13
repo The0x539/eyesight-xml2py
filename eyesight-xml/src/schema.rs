@@ -79,6 +79,17 @@ pub struct Link {
     pub to_socket: String,
 }
 
+impl Link {
+    pub fn new(from_node: &str, from_socket: &str, to_node: &str, to_socket: &str) -> Self {
+        Self {
+            from_node: from_node.into(),
+            to_node: to_node.into(),
+            from_socket: from_socket.into(),
+            to_socket: to_socket.into(),
+        }
+    }
+}
+
 impl std::fmt::Debug for Link {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

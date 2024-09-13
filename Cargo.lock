@@ -160,6 +160,8 @@ dependencies = [
 name = "color-db"
 version = "0.1.0"
 dependencies = [
+ "eyesight-xml",
+ "quick-xml",
  "sqlx",
  "tokio",
 ]
