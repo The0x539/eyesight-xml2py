@@ -22,6 +22,7 @@ pub struct StudioColor {
     pub note: String,
     pub instruction_rgb: Option<u32>,
     pub instruction_cmyk: Option<u32>,
+    pub category_nickname: Option<String>,
 }
 
 impl StudioColor {
@@ -59,6 +60,10 @@ impl StudioColor {
             color.instruction_cmyk = Some(parse_cmyk(w)?);
         }
 
+        if let Some(Some(w)) = words.next() {
+            color.category_nickname = Some(w.to_owned());
+        }
+
         if words.next().is_some() {
             return None;
         }
@@ -82,7 +87,10 @@ pub async fn insert_file(
     let mut lines = contents.lines();
 
     let header = lines.next().unwrap();
-    let columns = header.split('\t').collect::<Vec<_>>();
+    let mut columns = header.split('\t').collect::<Vec<_>>();
+    if columns.len() == 16 {
+        assert_eq!(columns.pop(), Some("Categogy NickName"));
+    }
     assert_eq!(
         columns,
         [
@@ -105,6 +113,9 @@ pub async fn insert_file(
     );
 
     for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
         let Some(color) = StudioColor::parse(line) else {
             println!("WARNING: studio line parse error");
             continue;

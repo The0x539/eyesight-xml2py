@@ -20,14 +20,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     sqlx::migrate!("./migrations").run(&mut *conn).await?;
 
-    let x = include_str!("/mnt/c/program files/studio 2.0 earlyaccess/ldraw/ldconfig.ldr");
-    ldraw::insert_file(x, "studio earlyaccess", &mut *conn).await?;
+    let ldraw_paths = [
+        "/mnt/c/program files/studio 2.0/ldraw/ldconfig.ldr",
+        "/mnt/c/users/andrew/documents/lego/rendering/ldraw/ldconfig.ldr",
+        "/mnt/c/users/andrew/documents/lego/rendering/ldraw/ldcfgalt.ldr",
+    ];
+    let ldraw_names = ["studio", "ldraw", "ldraw_alt"];
+    for (name, path) in ldraw_names.iter().zip(ldraw_paths) {
+        let ldconfig = std::fs::read_to_string(path)?;
+        ldraw::insert_file(&ldconfig, name, &mut *conn).await?;
+    }
 
-    let y =
-        include_str!("/mnt/c/program files/studio 2.0 earlyaccess/data/studiocolordefinition.txt");
-    studio::insert_file(y, "studio earlyaccess", &mut *conn).await?;
-
-    println!("done");
+    let studio_paths = [
+        "/mnt/c/program files/studio 2.0/data/studiocolordefinition.txt",
+        "/mnt/c/program files/studio 2.0/data/customcolordefinition.txt",
+        "/mnt/c/program files/studio 2.0/data/customcolors/customcolordefinition.txt",
+    ];
+    let studio_names = ["studio", "custom1", "custom2"];
+    for (name, path) in studio_names.iter().zip(studio_paths) {
+        let definitions = std::fs::read_to_string(path)?;
+        studio::insert_file(&definitions, name, &mut *conn).await?;
+    }
 
     Ok(())
 }
