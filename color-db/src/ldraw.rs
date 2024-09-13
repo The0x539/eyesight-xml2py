@@ -52,8 +52,8 @@ pub struct LDrawMaterial {
     pub fraction: f32,
     pub volume_fraction: Option<f32>,
     pub size: Option<u32>,
-    pub min_size: Option<u32>,
-    pub max_size: Option<u32>,
+    pub min_size: Option<f32>,
+    pub max_size: Option<f32>,
 }
 
 impl LDrawMaterial {
