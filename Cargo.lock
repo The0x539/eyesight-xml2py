@@ -51,17 +51,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-trait"
-version = "0.1.82"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27b8a3a6e1a44fa4c8baf1f653e4172e81486d4941f2237e20dc2d0cf4ddff1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,7 +161,6 @@ name = "color-db"
 version = "0.1.0"
 dependencies = [
  "sqlx",
- "sqlxinsert",
  "tokio",
 ]
 
@@ -1462,18 +1450,6 @@ dependencies = [
  "sqlx-core",
  "tracing",
  "url",
-]
-
-[[package]]
-name = "sqlxinsert"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "371a2005ee00d00cfa98691eddbd670131ba4033c0403008605ed592f480d76f"
-dependencies = [
- "async-trait",
- "quote",
- "sqlx",
- "syn 2.0.77",
 ]
 
 [[package]]
