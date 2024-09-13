@@ -79,7 +79,7 @@ impl LDrawMaterial {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("colors.sqlite");
-    std::fs::remove_file(&path)?;
+    let _ = std::fs::remove_file(&path);
 
     let options = SqliteConnectOptions::new()
         .filename(&path)
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pool_conn = pool.acquire().await?;
     let conn = pool_conn.acquire().await?;
 
-    sqlx::migrate!("db/migrations").run(&mut *conn).await?;
+    sqlx::migrate!("./migrations").run(&mut *conn).await?;
 
     let x = include_str!("/mnt/c/program files/studio 2.0 earlyaccess/ldraw/ldconfig.ldr");
     insert_file(x, "studio earlyaccess", &mut *conn).await?;
