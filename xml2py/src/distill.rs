@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::nodes::{Node, NodeInputValue};
-use crate::schema::{Material, Named};
+use eyesight_xml::nodes::{Node, NodeInputValue};
+use eyesight_xml::schema::{Material, Named};
 
 pub fn distill_materials(materials: &[Material]) {
     let mut materials = materials

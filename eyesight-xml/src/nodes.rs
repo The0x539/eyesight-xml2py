@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer};
-use serde_derive::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 
 use xml2py_macros::node;

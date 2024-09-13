@@ -1,8 +1,3 @@
-#[macro_use]
-pub mod nodes;
-
-mod schema;
-
 pub mod distill;
 pub mod groups;
 
@@ -12,9 +7,9 @@ mod lookups;
 
 use std::collections::BTreeMap;
 
+use eyesight_xml::nodes::Node;
+use eyesight_xml::schema::{Eyesight, Named};
 use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
-use nodes::Node;
-use schema::{Eyesight, Named};
 
 const SETTINGS_XML: &str =
     include_str!("/mnt/c/program files/studio 2.0/photorealisticrenderer/win/64/settings.xml");
@@ -22,8 +17,8 @@ const CUSTOM_XML: &str =
     include_str!("/mnt/c/program files/studio 2.0/data/CustomColors/CustomColorSettings.xml");
 
 fn main() {
-    let eyesight_main = quick_xml::de::from_str::<schema::Eyesight>(SETTINGS_XML).unwrap();
-    let eyesight_custom = quick_xml::de::from_str::<schema::Eyesight>(CUSTOM_XML).unwrap();
+    let eyesight_main = quick_xml::de::from_str::<Eyesight>(SETTINGS_XML).unwrap();
+    let eyesight_custom = quick_xml::de::from_str::<Eyesight>(CUSTOM_XML).unwrap();
     let mut eyesight = merge_eyesight(eyesight_main, eyesight_custom);
 
     beautify_names(&mut eyesight);

@@ -1,15 +1,11 @@
 [package]
-name = "xml2py"
+name = "eyesight-xml"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-enum_dispatch = "0.3.13"
-heck = "0.5.0"
-phf = { version = "0.11.2", features = ["macros"] }
 quick-xml = { version = "0.36.1", features = ["serialize", "overlapped-lists"] }
 serde = "1.0.210"
 serde_derive = "1.0.210"
 serde_with = "3.9.0"
-with_builtin_macros = "0.1.0"
-eyesight-xml = { path = "../eyesight-xml" }
+xml2py-macros = { path = "../xml2py-macros" }

@@ -368,6 +368,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "eyesight-xml"
+version = "0.1.0"
+dependencies = [
+ "quick-xml",
+ "serde",
+ "serde_derive",
+ "serde_with",
+ "xml2py-macros",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1967,6 +1978,7 @@ name = "xml2py"
 version = "0.1.0"
 dependencies = [
  "enum_dispatch",
+ "eyesight-xml",
  "heck",
  "phf",
  "quick-xml",
@@ -1974,7 +1986,6 @@ dependencies = [
  "serde_derive",
  "serde_with",
  "with_builtin_macros",
- "xml2py-macros",
 ]
 
 [[package]]

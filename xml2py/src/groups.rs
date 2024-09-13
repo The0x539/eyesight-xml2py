@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
+use eyesight_xml::{
     nodes::{GroupReference, Node, SocketType},
     schema::{Eyesight, Group},
 };

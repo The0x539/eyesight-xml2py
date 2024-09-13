@@ -4,8 +4,8 @@ use heck::AsSnakeCase;
 
 use crate::groups::Interface;
 use crate::lookups::INPUT_ALIASES;
-use crate::nodes::{INode, Node};
-use crate::schema::{Eyesight, Group, Link, Named};
+use eyesight_xml::nodes::{INode, Node};
+use eyesight_xml::schema::{Eyesight, Group, Link, Named};
 
 pub fn the_big_kahuna(eyesight: &Eyesight) -> String {
     let interfaces = crate::groups::check_interfaces(eyesight);
