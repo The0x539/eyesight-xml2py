@@ -287,10 +287,10 @@ impl TexMapping {
             v.push(format!("{tm}.mapping_x = '{x:?}'"));
         }
         if let Some(y) = self.y_mapping {
-            v.push(format!("{tm}.mapping_x = '{y:?}'"));
+            v.push(format!("{tm}.mapping_y = '{y:?}'"));
         }
         if let Some(z) = self.z_mapping {
-            v.push(format!("{tm}.mapping_x = '{z:?}'"));
+            v.push(format!("{tm}.mapping_z = '{z:?}'"));
         }
         if let Some(b) = self.use_minmax {
             v.push(format!("{tm}.use_minmax = {}", python_bool(b)));
