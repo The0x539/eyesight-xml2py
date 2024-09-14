@@ -373,6 +373,8 @@ dependencies = [
 name = "eyesight-xml"
 version = "0.1.0"
 dependencies = [
+ "enum_dispatch",
+ "heck",
  "quick-xml",
  "serde",
  "serde_derive",

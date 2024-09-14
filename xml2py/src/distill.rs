@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use eyesight_xml::nodes::{Node, NodeInputValue};
-use eyesight_xml::schema::{Material, Named};
+use eyesight_xml::schema::Material;
+use eyesight_xml::Named;
 
 pub fn distill_materials(materials: &[Material]) {
     let mut materials = materials

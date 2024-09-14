@@ -5,10 +5,11 @@ mod codegen;
 
 mod lookups;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use eyesight_xml::nodes::Node;
-use eyesight_xml::schema::{Eyesight, Named};
+use eyesight_xml::schema::Eyesight;
+use eyesight_xml::Named;
 use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
 
 const SETTINGS_XML: &str =
@@ -23,7 +24,26 @@ fn main() {
 
     beautify_names(&mut eyesight);
 
-    let s = codegen::the_big_kahuna(&eyesight);
+    let mut visited = HashSet::<&str>::new();
+    let mut unvisited = vec!["Solid"];
+
+    while let Some(name) = unvisited.pop() {
+        let group = eyesight.groups.iter().find(|g| g.name == name).unwrap();
+
+        for node in &group.shader.nodes {
+            if let Node::Group(gr) = node {
+                if !visited.contains(&*gr.group_name) {
+                    unvisited.push(&gr.group_name);
+                }
+            }
+        }
+
+        visited.insert(name);
+    }
+
+    println!("{visited:?}");
+
+    let s = codegen::the_big_kahuna(&eyesight, &visited);
     println!("{s}");
 
     // groups::check_interfaces(&eyesight);

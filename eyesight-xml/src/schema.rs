@@ -1,10 +1,6 @@
+use crate::Named;
 use serde_derive::Deserialize;
 use xml2py_macros::node;
-
-pub trait Named {
-    fn name(&self) -> &str;
-    fn name_mut(&mut self) -> &mut String;
-}
 
 #[derive(Deserialize, Debug)]
 pub struct Eyesight {

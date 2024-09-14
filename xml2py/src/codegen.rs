@@ -1,18 +1,23 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use heck::AsSnakeCase;
 
 use crate::groups::Interface;
 use crate::lookups::INPUT_ALIASES;
 use eyesight_xml::nodes::{INode, Node};
-use eyesight_xml::schema::{Eyesight, Group, Link, Named};
+use eyesight_xml::schema::{Eyesight, Group, Link};
+use eyesight_xml::Named;
 
-pub fn the_big_kahuna(eyesight: &Eyesight) -> String {
+pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) -> String {
     let interfaces = crate::groups::check_interfaces(eyesight);
 
     let mut file = String::new();
 
     for group in &eyesight.groups {
+        if !groups_to_convert.contains(&*group.name) {
+            continue;
+        }
+
         let Some(interface) = interfaces.get(&group.name) else {
             continue;
         };
@@ -86,6 +91,10 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
             format!("    location=({x}, {y}),"),
         ]);
 
+        for (name, val) in node.attributes() {
+            lines.push(format!("    {name}={val},"));
+        }
+
         let mut inputs = Vec::<(String, String)>::new();
 
         for link in inbound_edges
@@ -121,6 +130,7 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         }
 
         lines.push(")".into());
+        lines.extend(node.after());
         lines.push("".into());
     }
 

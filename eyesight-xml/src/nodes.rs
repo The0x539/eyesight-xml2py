@@ -1,12 +1,14 @@
 use std::borrow::Cow;
+use std::fmt::Debug;
 
-use serde::de::{Error, Unexpected};
-use serde::{Deserialize, Deserializer};
+use enum_dispatch::enum_dispatch;
+use serde::de::{Deserialize, Deserializer, Error, Unexpected};
+use serde_derive::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 
 use xml2py_macros::node;
 
-use crate::schema::Named;
+use crate::Named;
 
 pub trait INode: Named {
     const PYTHON_TYPE: &str;
@@ -16,6 +18,16 @@ pub trait INode: Named {
     fn inputs(&self) -> &[NodeInput] {
         &[]
     }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![]
+    }
+    fn after(&self) -> Vec<String> {
+        vec![]
+    }
+}
+
+fn python_enum(x: impl Debug) -> String {
+    format!("\"{x:?}\"").to_uppercase()
 }
 
 #[node]
@@ -40,9 +52,8 @@ impl std::fmt::Display for NodeInputValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Float(n) => write!(f, "{n}"),
-            Self::Vector(Vec3([x, y, z])) => write!(f, "({x}, {y}, {z})"),
+            Self::Vector(v) | Self::Color(v) => std::fmt::Display::fmt(v, f),
             Self::Int(n) => write!(f, "{n}"),
-            Self::Color(Vec3([r, g, b])) => write!(f, "({r}, {g}, {b})"),
             Self::Boolean(b) => f.write_str(if *b { "True" } else { "False" }),
         }
     }
@@ -157,6 +168,12 @@ impl<'de> Deserialize<'de> for GroupReferenceInput {
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct Vec3(pub [f32; 3]);
 
+impl std::fmt::Display for Vec3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&(self.0[0], self.0[1], self.0[2]), f)
+    }
+}
+
 impl<'de> Deserialize<'de> for Vec3 {
     fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
         let v = float_seq(de)?;
@@ -187,24 +204,6 @@ fn py_bool<'de, D: Deserializer<'de>, T: From<bool>>(de: D) -> Result<T, D::Erro
             Unexpected::Str(&s),
             &"true or false",
         )),
-    }
-}
-
-macro_rules! enums {
-    (
-        $(
-            $enum:ident {
-                $($variant:ident),*$(,)?
-            }
-        )*
-    ) => {
-        $(
-            #[derive(Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
-            #[serde(rename_all = "snake_case")]
-            pub enum $enum {
-                $($variant),*
-            }
-        )*
     }
 }
 
@@ -269,13 +268,43 @@ pub struct TexMapping {
     pub use_minmax: Option<bool>,
 }
 
+impl TexMapping {
+    fn to_python(&self, var: &str) -> Vec<String> {
+        let mut v = vec![
+            format!("{var}.texture_mapping.rotation = {}", self.rotation),
+            format!("{var}.texture_mapping.scale = {}", self.scale),
+            format!("{var}.texture_mapping.translation = {}", self.translation),
+            format!(
+                "{var}.texture_mapping.mapping = {}",
+                python_enum(self.mapping_type)
+            ),
+        ];
+        if let Some(x) = self.x_mapping {
+            v.push(format!("{var}.texture_mapping.mapping_x = \"{x:?}\""));
+        }
+        if let Some(y) = self.y_mapping {
+            v.push(format!("{var}.texture_mapping.mapping_x = \"{y:?}\""));
+        }
+        if let Some(z) = self.z_mapping {
+            v.push(format!("{var}.texture_mapping.mapping_x = \"{z:?}\""));
+        }
+        if let Some(b) = self.use_minmax {
+            v.push(format!(
+                "{var}.texture_mapping.use_minmax = {}",
+                python_bool(b)
+            ));
+        }
+        v
+    }
+}
+
 #[node]
 struct GroupReferenceOutput {
     #[rename = "@type"]
     data_type: SocketType,
 }
 
-#[node(ShaderNodeGroup)]
+#[node]
 struct GroupReference {
     group_name: String,
     #[serde(default)]
@@ -284,43 +313,129 @@ struct GroupReference {
     outputs: Vec<GroupReferenceOutput>,
 }
 
-#[node(NodeGroupInput)]
+impl INode for GroupReference {
+    const PYTHON_TYPE: &str = "ShaderNodeGroup";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("node_tree", format!("node_group_{}()", self.group_name))]
+    }
+    fn after(&self) -> Vec<String> {
+        self.inputs_
+            .iter()
+            .filter_map(|input| {
+                input.value.map(|value| NodeInput {
+                    name: input.name.clone(),
+                    value,
+                })
+            })
+            .map(|input| {
+                format!(
+                    "{}.inputs[\"{}\"].default_value = {}",
+                    self.name, input.name, input.value
+                )
+            })
+            .collect()
+    }
+}
+
+#[node]
 struct GroupInput {}
 
-#[node(NodeGroupOutput)]
+impl INode for GroupInput {
+    const PYTHON_TYPE: &str = "NodeGroupInput";
+}
+
+#[node]
 struct GroupOutput {}
 
-#[node(ShaderNodeBump)]
+impl INode for GroupOutput {
+    const PYTHON_TYPE: &str = "NodeGroupOutput";
+}
+
+#[node]
 struct Bump {
     enable: bool,
     invert: bool,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeTexNoise)]
+fn python_bool(b: bool) -> String {
+    match b {
+        true => "True".to_owned(),
+        false => "False".to_owned(),
+    }
+}
+
+impl INode for Bump {
+    const PYTHON_TYPE: &str = "ShaderNodeBump";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("mute", python_bool(!self.enable)),
+            ("invert", python_bool(self.invert)),
+        ]
+    }
+}
+
+#[node]
 struct NoiseTexture {
     #[serde(flatten)]
     tex_mapping: TexMapping,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeBevel)]
+impl INode for NoiseTexture {
+    const PYTHON_TYPE: &str = "ShaderNodeTexNoise";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn after(&self) -> Vec<String> {
+        self.tex_mapping.to_python(&self.name)
+    }
+}
+
+#[node]
 struct RoundingEdgeNormal {
     enable: bool,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeMix)]
+impl INode for RoundingEdgeNormal {
+    const PYTHON_TYPE: &str = "ShaderNodeBevel";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("mute", python_bool(!self.enable))]
+    }
+}
+
+#[node]
 struct SwitchClosure {
     enable: bool,
 }
 
-#[node(ShaderNodeMix)]
+impl INode for SwitchClosure {
+    const PYTHON_TYPE: &str = "ShaderNodeMixShader";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("mute", python_bool(!self.enable))]
+    }
+}
+
+#[node]
 struct MixClosure {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeMath)]
+impl INode for MixClosure {
+    const PYTHON_TYPE: &str = "ShaderNodeMixShader";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct Math {
     #[rename = "@type"]
     operation: MathOperation,
@@ -328,14 +443,37 @@ struct Math {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeMapping)]
+impl INode for Math {
+    const PYTHON_TYPE: &str = "ShaderNodeMath";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("operation", python_enum(self.operation)),
+            ("use_clamp", python_bool(self.use_clamp)),
+        ]
+    }
+}
+
+#[node]
 struct Mapping {
     #[serde(flatten)]
     tex_mapping: TexMapping,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeValToRGB)]
+impl INode for Mapping {
+    const PYTHON_TYPE: &str = "ShaderNodeMapping";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn after(&self) -> Vec<String> {
+        self.tex_mapping.to_python(&self.name)
+    }
+}
+
+#[node]
 struct RgbRamp {
     interpolate: bool,
     #[serde(deserialize_with = "float_seq")]
@@ -344,23 +482,67 @@ struct RgbRamp {
     ramp_alpha: Vec<f32>, // TODO
 }
 
-#[node(ShaderNodeBsdfDiffuse)]
+impl INode for RgbRamp {
+    const PYTHON_TYPE: &str = "ShaderNodeValToRGB";
+    fn after(&self) -> Vec<String> {
+        vec![format!(
+            "{}.color_ramp.interpolation = \"{}\"",
+            self.name,
+            if self.interpolate {
+                "LINEAR"
+            } else {
+                "CONSTANT"
+            }
+        )]
+        // TODO: ramps
+    }
+}
+
+#[node]
 struct DiffuseBsdf {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeGroup)]
+impl INode for DiffuseBsdf {
+    const PYTHON_TYPE: &str = "ShaderNodeBsdfDiffuse";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct ProjectToAxisPlane {}
 
-#[node(ShaderNodeValue)]
+impl INode for ProjectToAxisPlane {
+    const PYTHON_TYPE: &str = "ShaderNodeGroup";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![(
+            "node_tree",
+            "\"node_group_project_to_axis_plane()\"".to_owned(),
+        )]
+    }
+}
+
+#[node]
 struct Value {
     value: f32,
 }
 
-#[node(ShaderNodeObjectInfo)]
+impl INode for Value {
+    const PYTHON_TYPE: &str = "ShaderNodeValue";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("value", self.value.to_string())]
+    }
+}
+
+#[node]
 struct ObjectInfo {}
 
-#[node(ShaderNodeTexImage)]
+impl INode for ObjectInfo {
+    const PYTHON_TYPE: &str = "ShaderNodeObjectInfo";
+}
+
+#[node]
 struct ImageTexture {
     color_space: ColorSpace,
     extension: Extension,
@@ -373,7 +555,15 @@ struct ImageTexture {
     texel_per_pixel: f32,
 }
 
-#[node(ShaderNodeMix)]
+impl INode for ImageTexture {
+    const PYTHON_TYPE: &str = "ShaderNodeTexImage";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        // TODO
+        vec![]
+    }
+}
+
+#[node]
 struct MixValue {
     #[rename = "@type"]
     mix_type: MixType,
@@ -381,18 +571,50 @@ struct MixValue {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeMix)]
+impl INode for MixValue {
+    const PYTHON_TYPE: &str = "ShaderNodeMix";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("data_type", "VECTOR".into()),
+            ("blend_type", python_enum(self.mix_type)),
+            ("clamp_factor", python_bool(self.use_clamp)),
+            ("clamp_result", python_bool(self.use_clamp)),
+        ]
+    }
+}
+
+#[node]
 struct SwitchFloat {
     enable: bool,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeGroup)]
+impl INode for SwitchFloat {
+    const PYTHON_TYPE: &str = "ShaderNodeMix";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("mute", python_bool(!self.enable))]
+    }
+}
+
+#[node]
 struct UvDegradation {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeMix)]
+impl INode for UvDegradation {
+    const PYTHON_TYPE: &str = "ShaderNodeGroup";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("node_tree", "\"node_group_uv_degradation()\"".to_owned())]
+    }
+}
+
+#[node]
 struct Mix {
     #[rename = "@type"]
     operation: MixOperation,
@@ -400,7 +622,17 @@ struct Mix {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeVectorTransform)]
+impl INode for Mix {
+    const PYTHON_TYPE: &str = "ShaderNodeMix";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("data_type", "FLOAT".into()),
+            ("blend_type", python_enum(self.operation)),
+        ]
+    }
+}
+
+#[node]
 struct VectorTransform {
     convert_from: VectorSpace,
     convert_to: VectorSpace,
@@ -408,52 +640,141 @@ struct VectorTransform {
     vector_type: VectorType,
 }
 
-#[node(ShaderNodeTexCoord)]
+impl INode for VectorTransform {
+    const PYTHON_TYPE: &str = "ShaderNodeVectorTransform";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("convert_from", python_enum(self.convert_from)),
+            ("convert_to", python_enum(self.convert_to)),
+            ("vector_type", python_enum(self.vector_type)),
+        ]
+    }
+}
+
+#[node]
 struct TextureCoordinate {}
 
-#[node(ShaderNodeVectorMath)]
+impl INode for TextureCoordinate {
+    const PYTHON_TYPE: &str = "ShaderNodeTexCoord";
+}
+
+#[node]
 struct VectorMath {
     #[rename = "@type"]
     operation: VectorOperation,
 }
 
-#[node(ShaderNodeBsdfPrincipled)]
+impl INode for VectorMath {
+    const PYTHON_TYPE: &str = "ShaderNodeVectorMath";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("operation", python_enum(self.operation))]
+    }
+}
+
+#[node]
 struct PrincipledBsdf {
     distribution: BsdfDistribution,
     subsurface_method: Option<SubsurfaceMethod>,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeBrightContrast)]
+impl INode for PrincipledBsdf {
+    const PYTHON_TYPE: &str = "ShaderNodeBsdfPrincipled";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        let mut v = vec![("distribution", python_enum(self.distribution))];
+        if let Some(m) = self.subsurface_method {
+            v.push(("subsurface_method", python_enum(m)));
+        }
+        v
+    }
+}
+
+#[node]
 struct BrightnessContrast {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeNormalMap)]
+impl INode for BrightnessContrast {
+    const PYTHON_TYPE: &str = "ShaderNodeBrightContrast";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct NormalMap {
     attribute: String,
     space: NormalSpace,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeUVMap)]
+impl INode for NormalMap {
+    const PYTHON_TYPE: &str = "ShaderNodeNormalMap";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("attribute", format!("{:?}", self.attribute)),
+            ("space", python_enum(self.space)),
+        ]
+    }
+}
+
+#[node]
 struct Uvmap {
     attribute: String,
     from_dupli: bool,
 }
 
-#[node(ShaderNodeBsdfAnisotropic)] // unsure
+impl INode for Uvmap {
+    const PYTHON_TYPE: &str = "ShaderNodeUVMap";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![
+            ("attribute", format!("{:?}", self.attribute)),
+            ("from_dupli", python_bool(self.from_dupli)),
+        ]
+    }
+}
+
+#[node]
 struct GlossyBsdf {
     distribution: BsdfDistribution,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeRGB)] // TODO: Custom node group with a three-number panel or whatever
+impl INode for GlossyBsdf {
+    const PYTHON_TYPE: &str = "ShaderNodeBsdfAnisotropic"; // unsure
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("distribution", python_enum(self.distribution))]
+    }
+}
+
+#[node]
 struct Vector {
     value: Vec3,
 }
 
-#[node(ShaderNodeRGBCurve)]
+impl INode for Vector {
+    const PYTHON_TYPE: &str = "ShaderNodeCombineXYZ";
+    fn after(&self) -> Vec<String> {
+        let var = &self.name;
+        let [x, y, z] = self.value.0;
+        vec![
+            format!("{var}.inputs[0].default_value = {x}"),
+            format!("{var}.inputs[1].default_value = {y}"),
+            format!("{var}.inputs[2].default_value = {z}"),
+        ]
+    }
+}
+
+#[node]
 struct RgbCurves {
     #[serde(deserialize_with = "float_seq")]
     #[rename = "@curves"] // suppress the child-element autodetection
@@ -463,71 +784,118 @@ struct RgbCurves {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeTexVoronoi)]
+impl INode for RgbCurves {
+    const PYTHON_TYPE: &str = "ShaderNodeRGBCurve";
+    // TODO
+}
+
+#[node]
 struct VoronoiTexture {
     coloring: VoronoiColoring,
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeNewGeometry)]
+impl INode for VoronoiTexture {
+    const PYTHON_TYPE: &str = "ShaderNodeTexVoronoi";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct Geometry {}
 
-#[node(ShaderNodeVolumeAbsorption)]
+impl INode for Geometry {
+    const PYTHON_TYPE: &str = "ShaderNodeNewGeometry";
+}
+
+#[node]
 struct AbsorptionVolume {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeAddShader)]
+impl INode for AbsorptionVolume {
+    const PYTHON_TYPE: &str = "ShaderNodeVolumeAbsorption";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct AddClosure {}
 
-#[node(ShaderNode)]
+impl INode for AddClosure {
+    const PYTHON_TYPE: &str = "ShaderNodeAddShader";
+}
+
+#[node]
 struct LayerWeight {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeBsdfTranslucent)]
+impl INode for LayerWeight {
+    const PYTHON_TYPE: &str = "ShaderNodeLayerWeight";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct TranslucentBsdf {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeBsdfTransparent)]
+impl INode for TranslucentBsdf {
+    const PYTHON_TYPE: &str = "ShaderNodeBsdfTranslucent";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct TransparentBsdf {
     inputs: Vec<NodeInput>,
 }
 
-#[node(ShaderNodeRGB)]
+impl INode for TransparentBsdf {
+    const PYTHON_TYPE: &str = "ShaderNodeBsdfTransparent";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+}
+
+#[node]
 struct Color {
     value: Vec3,
 }
 
-#[node(ShaderNodeEmission)]
+impl INode for Color {
+    const PYTHON_TYPE: &str = "ShaderNodeRGB";
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("value", self.value.to_string())]
+    }
+}
+
+#[node]
 struct Emission {
     inputs: Vec<NodeInput>,
+}
+
+impl INode for Emission {
+    const PYTHON_TYPE: &str = "ShaderNodeEmission";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
 }
 
 macro_rules! nodes {
     ($name:ident $($ty:ident)*) => {
         #[derive(Deserialize, Debug, PartialEq, Clone)]
         #[serde(rename_all = "snake_case")]
+        #[enum_dispatch(Named)]
         pub enum Node {
             Group(GroupReference),
             $($ty($ty),)*
-        }
-
-        impl Named for Node {
-            fn name(&self) -> &str {
-                match self {
-                    Self::Group(x) => &x.name,
-                    $(Self::$ty(x) => &x.name,)*
-                }
-            }
-
-            fn name_mut(&mut self) -> &mut String {
-                match self {
-                    Self::Group(x) => &mut x.name,
-                    $(Self::$ty(x) => &mut x.name,)*
-                }
-            }
         }
 
         impl INode for Node {
@@ -542,6 +910,18 @@ macro_rules! nodes {
                 match self {
                     Self::Group(x) => x.inputs(),
                     $(Self::$ty(x) => x.inputs(),)*
+                }
+            }
+            fn attributes(&self) -> Vec<(&str, String)> {
+                match self {
+                    Self::Group(x) => x.attributes(),
+                    $(Self::$ty(x) => x.attributes(),)*
+                }
+            }
+            fn after(&self) -> Vec<String> {
+                match self {
+                    Self::Group(x) => x.after(),
+                    $(Self::$ty(x) => x.after(),)*
                 }
             }
         }
