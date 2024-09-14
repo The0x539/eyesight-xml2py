@@ -14,12 +14,16 @@ pub fn check_interfaces(eyesight: &Eyesight) -> HashMap<String, Interface> {
 
     let mut unused_groups = interfaces.keys().cloned().collect::<HashSet<_>>();
 
-    for material in &eyesight.materials {
-        for node in &material.shader.nodes {
-            if let Node::Group(node) = node {
-                check_socket_types(node, &mut interfaces);
-                unused_groups.remove(&node.group_name);
-            }
+    let shader_materials = eyesight.materials.iter().map(|m| &m.shader);
+    let group_materials = eyesight.groups.iter().map(|g| &g.shader);
+    let all_nodes = shader_materials
+        .chain(group_materials)
+        .flat_map(|g| &g.nodes);
+
+    for node in all_nodes {
+        if let Node::Group(node) = node {
+            check_socket_types(node, &mut interfaces);
+            unused_groups.remove(&node.group_name);
         }
     }
 
@@ -27,6 +31,7 @@ pub fn check_interfaces(eyesight: &Eyesight) -> HashMap<String, Interface> {
 
     for (name, incomplete) in interfaces {
         if unused_groups.contains(&name) {
+            eprintln!("{name}");
             continue;
         }
 

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
-use heck::ToSnakeCase;
+use heck::{ToShoutySnakeCase, ToSnakeCase};
 use serde::de::{Deserialize, Deserializer, Error, Unexpected};
 use serde_derive::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
@@ -19,6 +19,9 @@ pub trait INode: Named {
     fn inputs(&self) -> &[NodeInput] {
         &[]
     }
+    fn inputs_override(&self) -> Vec<&NodeInput> {
+        self.inputs().iter().collect()
+    }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![]
     }
@@ -28,7 +31,8 @@ pub trait INode: Named {
 }
 
 fn python_enum(x: impl Debug) -> String {
-    format!("\"{x:?}\"").to_uppercase()
+    // Hideous.
+    format!("\"{}\"", format!("{x:?}").to_shouty_snake_case())
 }
 
 #[node]
@@ -53,7 +57,8 @@ impl std::fmt::Display for NodeInputValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Float(n) => write!(f, "{n}"),
-            Self::Vector(v) | Self::Color(v) => std::fmt::Display::fmt(v, f),
+            Self::Vector(v) => write!(f, "{v}"),
+            Self::Color(Vec3([r, g, b])) => write!(f, "({r}, {g}, {b}, 1.0)"),
             Self::Int(n) => write!(f, "{n}"),
             Self::Boolean(b) => f.write_str(if *b { "True" } else { "False" }),
         }
@@ -271,29 +276,24 @@ pub struct TexMapping {
 
 impl TexMapping {
     fn to_python(&self, var: &str) -> Vec<String> {
+        let tm = format!("{var}.node.texture_mapping");
         let mut v = vec![
-            format!("{var}.texture_mapping.rotation = {}", self.rotation),
-            format!("{var}.texture_mapping.scale = {}", self.scale),
-            format!("{var}.texture_mapping.translation = {}", self.translation),
-            format!(
-                "{var}.texture_mapping.mapping = {}",
-                python_enum(self.mapping_type)
-            ),
+            format!("{tm}.rotation = {}", self.rotation),
+            format!("{tm}.scale = {}", self.scale),
+            format!("{tm}.translation = {}", self.translation),
+            format!("{tm}.vector_type = {}", python_enum(self.mapping_type)),
         ];
         if let Some(x) = self.x_mapping {
-            v.push(format!("{var}.texture_mapping.mapping_x = \"{x:?}\""));
+            v.push(format!("{tm}.mapping_x = \"{x:?}\""));
         }
         if let Some(y) = self.y_mapping {
-            v.push(format!("{var}.texture_mapping.mapping_x = \"{y:?}\""));
+            v.push(format!("{tm}.mapping_x = \"{y:?}\""));
         }
         if let Some(z) = self.z_mapping {
-            v.push(format!("{var}.texture_mapping.mapping_x = \"{z:?}\""));
+            v.push(format!("{tm}.mapping_x = \"{z:?}\""));
         }
         if let Some(b) = self.use_minmax {
-            v.push(format!(
-                "{var}.texture_mapping.use_minmax = {}",
-                python_bool(b)
-            ));
+            v.push(format!("{tm}.use_minmax = {}", python_bool(b)));
         }
         v
     }
@@ -333,7 +333,7 @@ impl INode for GroupReference {
             })
             .map(|input| {
                 format!(
-                    "{}.inputs[\"{}\"].default_value = {}",
+                    "{}.node.inputs[\"{}\"].default_value = {}",
                     self.name, input.name, input.value
                 )
             })
@@ -407,11 +407,15 @@ struct RoundingEdgeNormal {
 
 impl INode for RoundingEdgeNormal {
     const PYTHON_TYPE: &str = "ShaderNodeBevel";
-    fn inputs(&self) -> &[NodeInput] {
-        &self.inputs
+    fn inputs_override(&self) -> Vec<&NodeInput> {
+        self.inputs.iter().filter(|i| i.name != "Samples").collect()
     }
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("mute", python_bool(!self.enable))]
+        let mut v = vec![("mute", python_bool(!self.enable))];
+        if let Some(i) = self.inputs.iter().find(|i| i.name == "Samples") {
+            v.push(("samples", i.value.to_string()));
+        }
+        v
     }
 }
 
@@ -490,7 +494,7 @@ impl INode for RgbRamp {
     const PYTHON_TYPE: &str = "ShaderNodeValToRGB";
     fn after(&self) -> Vec<String> {
         vec![format!(
-            "{}.color_ramp.interpolation = \"{}\"",
+            "{}.node.color_ramp.interpolation = \"{}\"",
             self.name,
             if self.interpolate {
                 "LINEAR"
@@ -520,10 +524,7 @@ struct ProjectToAxisPlane {}
 impl INode for ProjectToAxisPlane {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![(
-            "node_tree",
-            "\"node_group_project_to_axis_plane()\"".to_owned(),
-        )]
+        vec![("node_tree", "node_group_project_to_axis_plane()".to_owned())]
     }
 }
 
@@ -534,8 +535,11 @@ struct Value {
 
 impl INode for Value {
     const PYTHON_TYPE: &str = "ShaderNodeValue";
-    fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("value", self.value.to_string())]
+    fn after(&self) -> Vec<String> {
+        vec![format!(
+            "{}.node.outputs[0].default_value = {}",
+            self.name, self.value,
+        )]
     }
 }
 
@@ -771,9 +775,9 @@ impl INode for Vector {
         let var = &self.name;
         let [x, y, z] = self.value.0;
         vec![
-            format!("{var}.inputs[0].default_value = {x}"),
-            format!("{var}.inputs[1].default_value = {y}"),
-            format!("{var}.inputs[2].default_value = {z}"),
+            format!("{var}.node.inputs[0].default_value = {x}"),
+            format!("{var}.node.inputs[1].default_value = {y}"),
+            format!("{var}.node.inputs[2].default_value = {z}"),
         ]
     }
 }
@@ -914,6 +918,12 @@ macro_rules! nodes {
                 match self {
                     Self::Group(x) => x.inputs(),
                     $(Self::$ty(x) => x.inputs(),)*
+                }
+            }
+            fn inputs_override(&self) -> Vec<&NodeInput> {
+                match self {
+                    Self::Group(x) => x.inputs_override(),
+                    $(Self::$ty(x) => x.inputs_override(),)*
                 }
             }
             fn attributes(&self) -> Vec<(&str, String)> {

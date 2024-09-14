@@ -41,6 +41,8 @@ fn main() {
         visited.insert(name);
     }
 
+    // println!("{visited:?}");
+
     let s = codegen::the_big_kahuna(&eyesight, &visited);
     println!("{s}");
 

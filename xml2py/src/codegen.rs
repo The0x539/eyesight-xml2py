@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::fmt::Write;
 
 use heck::AsSnakeCase;
 
@@ -12,6 +13,10 @@ pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) ->
     let interfaces = crate::groups::check_interfaces(eyesight);
 
     let mut file = String::new();
+
+    writeln!(file, "import bpy").unwrap();
+    writeln!(file, "from .node_dsl import NodeGraph").unwrap();
+    writeln!(file).unwrap();
 
     for group in &eyesight.groups {
         if !groups_to_convert.contains(&*group.name) {
@@ -35,6 +40,14 @@ pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) ->
     }
 
     file
+}
+
+fn get_socket_key(s: &str) -> String {
+    if let Ok(n) = s.parse::<u32>() {
+        n.to_string()
+    } else {
+        format!("{s:?}") // escapes and quotes
+    }
 }
 
 fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
@@ -103,14 +116,11 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
             .unwrap_or_default()
         {
             let src_node = &link.from_node;
-            let src_socket = &link.from_socket;
-            inputs.push((
-                link.to_socket.clone(),
-                format!("{src_node}[\"{src_socket}\"]"),
-            ))
+            let src_socket = get_socket_key(&link.from_socket);
+            inputs.push((link.to_socket.clone(), format!("{src_node}[{src_socket}]")))
         }
 
-        for input in node.inputs() {
+        for input in node.inputs_override() {
             inputs.push((input.name.clone(), input.value.to_string()));
         }
 
@@ -122,8 +132,9 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
                 if let Some(alias) = INPUT_ALIASES.get(type_name).and_then(|m| m.get(dst_socket)) {
                     dst_socket = alias;
                 }
+                let dst_socket = get_socket_key(dst_socket);
 
-                lines.push(format!("        \"{dst_socket}\": {value},"));
+                lines.push(format!("        {dst_socket}: {value},"));
             }
 
             lines.push("    },".into());
@@ -140,52 +151,38 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
 }
 
 fn topographic_sort<'a>(nodes: &'a [Node], links: &[Link]) -> Vec<Vec<&'a Node>> {
-    let mut outbound_edges = BTreeMap::<&str, Vec<&str>>::new();
+    let mut inbound_edges = BTreeMap::<&str, BTreeSet<&str>>::new();
     for link in links {
-        outbound_edges
-            .entry(&link.from_node)
+        inbound_edges
+            .entry(&link.to_node)
             .or_default()
-            .push(&link.to_node);
+            .insert(&link.from_node);
     }
 
-    let mut unvisited = nodes
-        .iter()
-        .map(|n| (n.name(), n))
-        .collect::<BTreeMap<_, _>>();
+    let mut visited = BTreeSet::new();
 
     let mut tiers = vec![];
-    let mut current_tier = vec![];
 
-    // gather the nodes with an in-degree of 0
-    current_tier.extend(nodes.iter().filter(|n| {
-        !outbound_edges
-            .values()
-            .flatten()
-            .any(|dst_node_name| n.name() == *dst_node_name)
-    }));
-    for n in &current_tier {
-        unvisited.remove(n.name()).unwrap();
-    }
+    loop {
+        let current_tier = nodes
+            .iter()
+            .filter(|n| !visited.contains(n.name()))
+            .filter(|n| inbound_edges.get(n.name()).is_none_or(|v| v.is_empty()))
+            .collect::<Vec<_>>();
 
-    // breadth-first search
-    while !current_tier.is_empty() {
-        let mut next_tier = vec![];
-        for src_node in &current_tier {
-            let Some(out_links) = outbound_edges.get(src_node.name()) else {
-                continue;
-            };
-            for out_link in out_links {
-                if let Some(dst_node) = unvisited.remove(out_link) {
-                    next_tier.push(dst_node);
-                }
+        if current_tier.is_empty() {
+            break;
+        }
+
+        for node in &current_tier {
+            for edges in inbound_edges.values_mut() {
+                edges.remove(node.name());
             }
+            visited.insert(node.name());
         }
 
         tiers.push(current_tier);
-        current_tier = next_tier;
     }
-
-    assert!(unvisited.is_empty());
 
     tiers
 }
