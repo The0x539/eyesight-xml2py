@@ -64,7 +64,7 @@ fn main() {
     }
 
     let mut visited = HashSet::<&str>::new();
-    let mut unvisited = vec!["Solid"];
+    let mut unvisited = vec!["Solid", "Trans Group Base"];
 
     while let Some(name) = unvisited.pop() {
         let group = eyesight.groups.iter().find(|g| g.name == name).unwrap();

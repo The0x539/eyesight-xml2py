@@ -728,6 +728,10 @@ impl INode for PrincipledBsdf {
                     if let NodeInputValue::Float(n) = i.value {
                         i.value = NodeInputValue::Color(Vec3([n, n, n]));
                     }
+                } else if i.name == "SubsurfaceColor" {
+                    if let NodeInputValue::Color(x) = i.value {
+                        i.value = NodeInputValue::Vector(x)
+                    }
                 }
                 i
             })
