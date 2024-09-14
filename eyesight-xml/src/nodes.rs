@@ -582,40 +582,12 @@ struct ImageTexture {
 impl INode for ImageTexture {
     const PYTHON_TYPE: &str = "ShaderNodeTexImage";
     fn attributes(&self) -> Vec<(&str, String)> {
-        // TODO
-        vec![]
-    }
-    fn after(&self) -> Vec<String> {
-        if let Some(filename) = &self.filename {
-            // TODO: be better
-            // TODO: can this be squished into attributes?
-            // this filepath may include quotes somewhow
-            let the_variable_1 = format!("img_filename = {filename:?}");
-            let the_variable_2 = format!("{}.node.image = img", self.name);
-            [
-                "eyesight_path = 'C:/Program Files/Studio 2.0/PhotoRealisticRenderer/win/64/'",
-                &the_variable_1,
-                "img = bpy.data.images.get(img_filename)",
-                "img_path = os.path.join(eyesight_path, img_filename)",
-                // TODO: does check_existing reuse image objects (desired) or just the underlying buffer?
-                "img = bpy.data.images.load(img_path, check_existing=True)",
-                &the_variable_2,
-            ]
-            .map(String::from)
-            .into()
-        } else {
-            let the_variable = self.name.clone() + ".image = img";
-            [
-                "img = bpy.data.images.get('blank')",
-                "if img is None:",
-                "    img = bpy.data.images.new('blank', 1, 1, alpha=True)",
-                "    img.pixels = (0.0, 0.0, 0.0, 0.0)",
-                "    img.update()",
-                &the_variable,
-            ]
-            .map(String::from)
-            .into()
-        }
+        let image_name = match &self.filename {
+            Some(filename) => format!("{filename:?}"),
+            None => "None".to_owned(),
+        };
+        // TODO: all the other attributes
+        vec![("image", format!("load_image({image_name})"))]
     }
 }
 
