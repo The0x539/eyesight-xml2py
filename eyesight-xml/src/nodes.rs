@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+u,se std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
@@ -606,7 +606,7 @@ impl INode for MixValue {
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("data_type", "'VECTOR'".into()),
+            ("data_type", "'FLOAT'".into()),
             ("blend_type", python_enum(self.mix_type)),
             ("clamp_factor", python_bool(self.use_clamp)),
             ("clamp_result", python_bool(self.use_clamp)),
@@ -626,7 +626,10 @@ impl INode for SwitchFloat {
         &self.inputs
     }
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("mute", python_bool(!self.enable))]
+        vec![
+            ("data_type", "'FLOAT'".into()),
+            ("mute", python_bool(!self.enable)),
+        ]
     }
 }
 

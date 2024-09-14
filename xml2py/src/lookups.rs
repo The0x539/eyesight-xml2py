@@ -30,16 +30,16 @@ pub static INPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'static
     "ShaderNodeAddShader" => phf_map! { "Shader1" => "0", "Shader2" => "1" },
     "ShaderNodeMixShader" => phf_map! { "Shader1" => "1", "Shader2" => "2" },
     "ShaderNodeMix" => phf_map! {
-        "Fac" => "0",
+        "Fac" => "Factor",
         // <switch_float>
-        "ValueDisable" => "2",
-        "ValueEnable" => "3",
+        "ValueDisable" => "A",
+        "ValueEnable" => "B",
         // <mix_value>
-        "Value1" => "2",
-        "Value2" => "3",
+        "Value1" => "A",
+        "Value2" => "B",
         // <mix>
-        "Color1" => "6",
-        "Color2" => "7",
+        "Color1" => "A",
+        "Color2" => "B",
     },
 };
 
