@@ -19,8 +19,8 @@ pub trait INode: Named {
     fn inputs(&self) -> &[NodeInput] {
         &[]
     }
-    fn inputs_override(&self) -> Vec<&NodeInput> {
-        self.inputs().iter().collect()
+    fn inputs_override(&self) -> Vec<NodeInput> {
+        self.inputs().to_vec()
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![]
@@ -236,7 +236,7 @@ enums! {
     }
 
     Axis { X, Y, Z }
-    VectorOperation { Average }
+    VectorOperation { Average, Multiply, Add }
     BsdfDistribution { Ggx }
     Projection { Flat }
     VectorType { Point }
@@ -407,8 +407,12 @@ struct RoundingEdgeNormal {
 
 impl INode for RoundingEdgeNormal {
     const PYTHON_TYPE: &str = "ShaderNodeBevel";
-    fn inputs_override(&self) -> Vec<&NodeInput> {
-        self.inputs.iter().filter(|i| i.name != "Samples").collect()
+    fn inputs_override(&self) -> Vec<NodeInput> {
+        self.inputs
+            .iter()
+            .filter(|i| i.name != "Samples")
+            .cloned()
+            .collect()
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         let mut v = vec![("mute", python_bool(!self.enable))];
@@ -473,11 +477,23 @@ struct Mapping {
 
 impl INode for Mapping {
     const PYTHON_TYPE: &str = "ShaderNodeMapping";
-    fn inputs(&self) -> &[NodeInput] {
-        &self.inputs
-    }
-    fn after(&self) -> Vec<String> {
-        self.tex_mapping.to_python(&self.name)
+    fn inputs_override(&self) -> Vec<NodeInput> {
+        let mut v = self.inputs.clone();
+        v.extend([
+            NodeInput {
+                name: "Location".into(),
+                value: NodeInputValue::Vector(self.tex_mapping.translation),
+            },
+            NodeInput {
+                name: "Rotation".into(),
+                value: NodeInputValue::Vector(self.tex_mapping.rotation),
+            },
+            NodeInput {
+                name: "Scale".into(),
+                value: NodeInputValue::Vector(self.tex_mapping.scale),
+            },
+        ]);
+        v
     }
 }
 
@@ -586,7 +602,7 @@ impl INode for MixValue {
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("data_type", "VECTOR".into()),
+            ("data_type", "\"VECTOR\"".into()),
             ("blend_type", python_enum(self.mix_type)),
             ("clamp_factor", python_bool(self.use_clamp)),
             ("clamp_result", python_bool(self.use_clamp)),
@@ -618,7 +634,7 @@ struct UvDegradation {
 impl INode for UvDegradation {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("node_tree", "\"node_group_uv_degradation()\"".to_owned())]
+        vec![("node_tree", "node_group_uv_degradation()".to_owned())]
     }
 }
 
@@ -634,7 +650,7 @@ impl INode for Mix {
     const PYTHON_TYPE: &str = "ShaderNodeMix";
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("data_type", "FLOAT".into()),
+            ("data_type", "\"FLOAT\"".into()),
             ("blend_type", python_enum(self.operation)),
         ]
     }
@@ -670,10 +686,14 @@ impl INode for TextureCoordinate {
 struct VectorMath {
     #[rename = "@type"]
     operation: VectorOperation,
+    inputs: Vec<NodeInput>,
 }
 
 impl INode for VectorMath {
     const PYTHON_TYPE: &str = "ShaderNodeVectorMath";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![("operation", python_enum(self.operation))]
     }
@@ -697,6 +717,21 @@ impl INode for PrincipledBsdf {
             v.push(("subsurface_method", python_enum(m)));
         }
         v
+    }
+
+    fn inputs_override(&self) -> Vec<NodeInput> {
+        self.inputs
+            .iter()
+            .cloned()
+            .map(|mut i| {
+                if i.name.ends_with("Tint") {
+                    if let NodeInputValue::Float(n) = i.value {
+                        i.value = NodeInputValue::Color(Vec3([n, n, n]));
+                    }
+                }
+                i
+            })
+            .collect()
     }
 }
 
@@ -726,7 +761,7 @@ impl INode for NormalMap {
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("attribute", format!("{:?}", self.attribute)),
+            ("uv_map", format!("{:?}", self.attribute)),
             ("space", python_enum(self.space)),
         ]
     }
@@ -742,8 +777,8 @@ impl INode for Uvmap {
     const PYTHON_TYPE: &str = "ShaderNodeUVMap";
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("attribute", format!("{:?}", self.attribute)),
-            ("from_dupli", python_bool(self.from_dupli)),
+            ("uv_map", format!("{:?}", self.attribute)),
+            ("from_instancer", python_bool(self.from_dupli)),
         ]
     }
 }
@@ -920,7 +955,7 @@ macro_rules! nodes {
                     $(Self::$ty(x) => x.inputs(),)*
                 }
             }
-            fn inputs_override(&self) -> Vec<&NodeInput> {
+            fn inputs_override(&self) -> Vec<NodeInput> {
                 match self {
                     Self::Group(x) => x.inputs_override(),
                     $(Self::$ty(x) => x.inputs_override(),)*

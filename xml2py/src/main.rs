@@ -7,7 +7,7 @@ mod lookups;
 
 use std::collections::{BTreeMap, HashSet};
 
-use eyesight_xml::nodes::Node;
+use eyesight_xml::nodes::{Node, NodeInput, NodeInputValue, Vec3, VectorMath, VectorOperation};
 use eyesight_xml::schema::Eyesight;
 use eyesight_xml::Named;
 use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
@@ -23,6 +23,45 @@ fn main() {
     let mut eyesight = merge_eyesight(eyesight_main, eyesight_custom);
 
     beautify_names(&mut eyesight);
+
+    // handle vector average nodes, stupid annoying ugh
+    let all_shaders_mut = eyesight
+        .materials
+        .iter_mut()
+        .map(|m| &mut m.shader)
+        .chain(eyesight.groups.iter_mut().map(|g| &mut g.shader));
+
+    for shader in all_shaders_mut {
+        for i in 0..shader.nodes.len() {
+            let node = &mut shader.nodes[i];
+            let Node::VectorMath(vector_math) = node else {
+                continue;
+            };
+
+            if vector_math.operation != VectorOperation::Average {
+                continue;
+            };
+
+            vector_math.operation = VectorOperation::Add;
+
+            let part_2 = VectorMath {
+                operation: VectorOperation::Multiply,
+                name: vector_math.name.clone() + "_part_2",
+                inputs: vec![NodeInput {
+                    name: "1".into(),
+                    value: NodeInputValue::Vector(Vec3([0.5, 0.5, 0.5])),
+                }],
+            };
+
+            for link in &mut shader.links {
+                if link.from_node == vector_math.name {
+                    link.from_node = part_2.name.clone();
+                }
+            }
+
+            shader.nodes.push(Node::VectorMath(part_2));
+        }
+    }
 
     let mut visited = HashSet::<&str>::new();
     let mut unvisited = vec!["Solid"];

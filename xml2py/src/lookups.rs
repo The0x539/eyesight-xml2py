@@ -42,3 +42,14 @@ pub static INPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'static
         "Color2" => "7",
     },
 };
+
+pub static OUTPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'static str>> = phf_map! {
+    "ShaderNodeMix" => phf_map! {
+        "Value" => "Result",
+        "ValueOut" => "Result",
+        "Color" => "Result",
+    },
+    "ShaderNodeTexVoronoi" => phf_map!{
+        "Fac" => "Distance",
+    },
+};

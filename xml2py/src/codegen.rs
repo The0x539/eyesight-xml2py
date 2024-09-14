@@ -4,7 +4,7 @@ use std::fmt::Write;
 use heck::AsSnakeCase;
 
 use crate::groups::Interface;
-use crate::lookups::INPUT_ALIASES;
+use crate::lookups::{INPUT_ALIASES, OUTPUT_ALIASES};
 use eyesight_xml::nodes::{INode, Node};
 use eyesight_xml::schema::{Eyesight, Group, Link};
 use eyesight_xml::Named;
@@ -16,6 +16,11 @@ pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) ->
 
     writeln!(file, "import bpy").unwrap();
     writeln!(file, "from .node_dsl import NodeGraph").unwrap();
+    writeln!(
+        file,
+        "from .custom_nodes import node_group_uv_degradation, node_group_project_to_axis_plane"
+    )
+    .unwrap();
     writeln!(file).unwrap();
 
     for group in &eyesight.groups {
@@ -116,7 +121,17 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
             .unwrap_or_default()
         {
             let src_node = &link.from_node;
-            let src_socket = get_socket_key(&link.from_socket);
+            let mut src_socket = &*link.from_socket;
+
+            if let Some(src_node_obj) = group.shader.nodes.iter().find(|n| n.name() == src_node) {
+                if let Some(alias_table) = OUTPUT_ALIASES.get(src_node_obj.python_type()) {
+                    if let Some(alias) = alias_table.get(src_socket) {
+                        src_socket = alias;
+                    }
+                }
+            }
+
+            let src_socket = get_socket_key(src_socket);
             inputs.push((link.to_socket.clone(), format!("{src_node}[{src_socket}]")))
         }
 
