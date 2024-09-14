@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
+use heck::ToSnakeCase;
 use serde::de::{Deserialize, Deserializer, Error, Unexpected};
 use serde_derive::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
@@ -316,7 +317,10 @@ struct GroupReference {
 impl INode for GroupReference {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("node_tree", format!("node_group_{}()", self.group_name))]
+        vec![(
+            "node_tree",
+            format!("node_group_{}()", self.group_name.to_snake_case()),
+        )]
     }
     fn after(&self) -> Vec<String> {
         self.inputs_
