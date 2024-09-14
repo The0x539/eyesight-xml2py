@@ -477,6 +477,7 @@ struct Mapping {
 
 impl INode for Mapping {
     const PYTHON_TYPE: &str = "ShaderNodeMapping";
+
     fn inputs_override(&self) -> Vec<NodeInput> {
         let mut v = self.inputs.clone();
         v.extend([
@@ -494,6 +495,10 @@ impl INode for Mapping {
             },
         ]);
         v
+    }
+
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("vector_type", python_enum(self.tex_mapping.mapping_type))]
     }
 }
 
