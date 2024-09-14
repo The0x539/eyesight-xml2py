@@ -52,4 +52,7 @@ pub static OUTPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'stati
     "ShaderNodeTexVoronoi" => phf_map!{
         "Fac" => "Distance",
     },
+    "ShaderNodeBrightContrast" => phf_map! {
+        "OutColor" => "Color",
+    }
 };

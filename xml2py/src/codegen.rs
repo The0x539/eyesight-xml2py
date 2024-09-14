@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fmt::Write;
 
 use heck::AsSnakeCase;
 
@@ -12,16 +11,7 @@ use eyesight_xml::Named;
 pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) -> String {
     let interfaces = crate::groups::check_interfaces(eyesight);
 
-    let mut file = String::new();
-
-    writeln!(file, "import bpy").unwrap();
-    writeln!(file, "from .node_dsl import NodeGraph").unwrap();
-    writeln!(
-        file,
-        "from .custom_nodes import node_group_uv_degradation, node_group_project_to_axis_plane"
-    )
-    .unwrap();
-    writeln!(file).unwrap();
+    let mut file = include_str!("header.py").to_owned();
 
     for group in &eyesight.groups {
         if !groups_to_convert.contains(&*group.name) {

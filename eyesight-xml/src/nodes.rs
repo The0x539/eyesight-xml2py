@@ -32,7 +32,7 @@ pub trait INode: Named {
 
 fn python_enum(x: impl Debug) -> String {
     // Hideous.
-    format!("\"{}\"", format!("{x:?}").to_shouty_snake_case())
+    format!("'{}'", format!("{x:?}").to_shouty_snake_case())
 }
 
 #[node]
@@ -284,13 +284,13 @@ impl TexMapping {
             format!("{tm}.vector_type = {}", python_enum(self.mapping_type)),
         ];
         if let Some(x) = self.x_mapping {
-            v.push(format!("{tm}.mapping_x = \"{x:?}\""));
+            v.push(format!("{tm}.mapping_x = '{x:?}'"));
         }
         if let Some(y) = self.y_mapping {
-            v.push(format!("{tm}.mapping_x = \"{y:?}\""));
+            v.push(format!("{tm}.mapping_x = '{y:?}'"));
         }
         if let Some(z) = self.z_mapping {
-            v.push(format!("{tm}.mapping_x = \"{z:?}\""));
+            v.push(format!("{tm}.mapping_x = '{z:?}'"));
         }
         if let Some(b) = self.use_minmax {
             v.push(format!("{tm}.use_minmax = {}", python_bool(b)));
@@ -333,7 +333,7 @@ impl INode for GroupReference {
             })
             .map(|input| {
                 format!(
-                    "{}.node.inputs[\"{}\"].default_value = {}",
+                    "{}.node.inputs['{}'].default_value = {}",
                     self.name, input.name, input.value
                 )
             })
@@ -510,7 +510,7 @@ impl INode for RgbRamp {
     const PYTHON_TYPE: &str = "ShaderNodeValToRGB";
     fn after(&self) -> Vec<String> {
         vec![format!(
-            "{}.node.color_ramp.interpolation = \"{}\"",
+            "{}.node.color_ramp.interpolation = '{}'",
             self.name,
             if self.interpolate {
                 "LINEAR"
@@ -585,6 +585,38 @@ impl INode for ImageTexture {
         // TODO
         vec![]
     }
+    fn after(&self) -> Vec<String> {
+        if let Some(filename) = &self.filename {
+            // TODO: be better
+            // TODO: can this be squished into attributes?
+            // this filepath may include quotes somewhow
+            let the_variable_1 = format!("img_filename = {filename:?}");
+            let the_variable_2 = format!("{}.node.image = img", self.name);
+            [
+                "eyesight_path = 'C:/Program Files/Studio 2.0/PhotoRealisticRenderer/win/64/'",
+                &the_variable_1,
+                "img = bpy.data.images.get(img_filename)",
+                "img_path = os.path.join(eyesight_path, img_filename)",
+                // TODO: does check_existing reuse image objects (desired) or just the underlying buffer?
+                "img = bpy.data.images.load(img_path, check_existing=True)",
+                &the_variable_2,
+            ]
+            .map(String::from)
+            .into()
+        } else {
+            let the_variable = self.name.clone() + ".image = img";
+            [
+                "img = bpy.data.images.get('blank')",
+                "if img is None:",
+                "    img = bpy.data.images.new('blank', 1, 1, alpha=True)",
+                "    img.pixels = (0.0, 0.0, 0.0, 0.0)",
+                "    img.update()",
+                &the_variable,
+            ]
+            .map(String::from)
+            .into()
+        }
+    }
 }
 
 #[node]
@@ -602,7 +634,7 @@ impl INode for MixValue {
     }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("data_type", "\"VECTOR\"".into()),
+            ("data_type", "'VECTOR'".into()),
             ("blend_type", python_enum(self.mix_type)),
             ("clamp_factor", python_bool(self.use_clamp)),
             ("clamp_result", python_bool(self.use_clamp)),
@@ -650,7 +682,7 @@ impl INode for Mix {
     const PYTHON_TYPE: &str = "ShaderNodeMix";
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
-            ("data_type", "\"FLOAT\"".into()),
+            ("data_type", "'RGBA'".into()),
             ("blend_type", python_enum(self.operation)),
         ]
     }
