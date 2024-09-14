@@ -236,7 +236,7 @@ enums! {
     }
 
     Axis { X, Y, Z }
-    VectorOperation { Average, Multiply, Add }
+    VectorOperation { Average, Multiply, Add, Scale }
     BsdfDistribution { Ggx }
     Projection { Flat }
     VectorType { Point }

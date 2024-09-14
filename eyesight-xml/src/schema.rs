@@ -10,6 +10,14 @@ pub struct Eyesight {
     pub groups: Vec<Group>,
 }
 
+impl Eyesight {
+    pub fn all_shaders_mut(&mut self) -> impl Iterator<Item = &mut Shader> {
+        let material_shaders = self.materials.iter_mut().map(|m| &mut m.shader);
+        let group_shaders = self.groups.iter_mut().map(|g| &mut g.shader);
+        material_shaders.chain(group_shaders)
+    }
+}
+
 #[derive(Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Group {
