@@ -1,4 +1,4 @@
-u,se std::borrow::Cow;
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
@@ -614,6 +614,22 @@ impl INode for MixValue {
     }
 }
 
+// Not actually used in Eyesight XML, but exists as a polyfill for <vector_math type="average">
+#[node]
+struct MixVector {
+    inputs: Vec<NodeInput>,
+}
+
+impl INode for MixVector {
+    const PYTHON_TYPE: &str = "ShaderNodeMix";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
+    fn attributes(&self) -> Vec<(&str, String)> {
+        vec![("data_type", "'VECTOR'".into())]
+    }
+}
+
 #[node]
 struct SwitchFloat {
     enable: bool,
@@ -997,5 +1013,5 @@ nodes! {
     VectorTransform TextureCoordinate VectorMath PrincipledBsdf
     BrightnessContrast NormalMap Uvmap GlossyBsdf Vector RgbCurves
     VoronoiTexture Geometry AbsorptionVolume AddClosure LayerWeight
-    TranslucentBsdf TransparentBsdf Color Emission
+    TranslucentBsdf TransparentBsdf Color Emission MixVector
 }

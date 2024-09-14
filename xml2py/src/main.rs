@@ -7,8 +7,8 @@ mod lookups;
 
 use std::collections::{BTreeMap, HashSet};
 
-use eyesight_xml::nodes::{Node, NodeInput, NodeInputValue, VectorMath, VectorOperation};
-use eyesight_xml::schema::{Eyesight, Link, Shader};
+use eyesight_xml::nodes::{MixVector, Node, VectorOperation};
+use eyesight_xml::schema::{Eyesight, Shader};
 use eyesight_xml::Named;
 use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
 
@@ -55,8 +55,6 @@ fn main() {
     // distill::distill_materials(&eyesight.materials);
 }
 
-// <vector_math type="average"> doesn't actually have a direct equivalent in Blender,
-// so emulate it using <vector_math type="add"> -> <vector_math type="scale">
 fn implement_vector_average(shader: &mut Shader) {
     // index-based iteration lets us push to shader.nodes inside the loop body
     for i in 0..shader.nodes.len() {
@@ -69,30 +67,10 @@ fn implement_vector_average(shader: &mut Shader) {
             continue;
         };
 
-        // first, add the two inputs
-        vector_math.operation = VectorOperation::Add;
-        let add = vector_math;
+        let name = node.name().to_owned();
+        let inputs = vec![];
 
-        // then, halve the result
-        let scale = VectorMath {
-            operation: VectorOperation::Scale,
-            name: add.name.clone() + "_part_2",
-            inputs: vec![NodeInput {
-                name: "Scale".into(),
-                value: NodeInputValue::Float(0.5),
-            }],
-        };
-
-        // take anything that was reading from node 1 and reconnect it to node 2
-        for link in &mut shader.links {
-            if link.from_node == add.name {
-                link.from_node = scale.name.clone();
-            }
-        }
-
-        let link = Link::new(&add.name, "Vector", &scale.name, "0");
-        shader.nodes.push(Node::VectorMath(scale));
-        shader.links.push(link);
+        *node = Node::MixVector(MixVector { name, inputs });
     }
 }
 

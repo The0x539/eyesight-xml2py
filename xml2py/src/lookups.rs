@@ -40,6 +40,9 @@ pub static INPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'static
         // <mix>
         "Color1" => "A",
         "Color2" => "B",
+        // <vector_math type="average">
+        "Vector1" => "A",
+        "Vector2" => "B",
     },
 };
 
@@ -48,6 +51,7 @@ pub static OUTPUT_ALIASES: phf::Map<&'static str, phf::Map<&'static str, &'stati
         "Value" => "Result",
         "ValueOut" => "Result",
         "Color" => "Result",
+        "Vector" => "Result",
     },
     "ShaderNodeTexVoronoi" => phf_map!{
         "Fac" => "Distance",
