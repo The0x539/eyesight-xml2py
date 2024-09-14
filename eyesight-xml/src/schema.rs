@@ -57,7 +57,7 @@ pub struct Material {
     shader: Shader,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Shader {
     #[serde(rename = "$value")]
