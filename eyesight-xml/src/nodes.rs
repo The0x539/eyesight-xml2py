@@ -42,6 +42,15 @@ struct NodeInput {
     value: NodeInputValue,
 }
 
+impl NodeInput {
+    pub fn new(name: &str, value: impl Into<NodeInputValue>) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Deserialize, Debug, PartialEq, Copy, Clone)]
 #[serde(tag = "@type", content = "@value", rename_all = "snake_case")]
@@ -51,6 +60,12 @@ pub enum NodeInputValue {
     Int(#[serde_as(as = "DisplayFromStr")] u32),
     Color(Vec3),
     Boolean(#[serde(deserialize_with = "py_bool")] bool),
+}
+
+impl From<f32> for NodeInputValue {
+    fn from(value: f32) -> Self {
+        Self::Float(value)
+    }
 }
 
 impl std::fmt::Display for NodeInputValue {

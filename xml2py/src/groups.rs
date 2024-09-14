@@ -22,7 +22,9 @@ pub fn check_interfaces(eyesight: &Eyesight) -> HashMap<String, Interface> {
 
     for node in all_nodes {
         if let Node::Group(node) = node {
-            check_socket_types(node, &mut interfaces);
+            if node.group_name != "Is Slope" {
+                check_socket_types(node, &mut interfaces);
+            }
             unused_groups.remove(&node.group_name);
         }
     }

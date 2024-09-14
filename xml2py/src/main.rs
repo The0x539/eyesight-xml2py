@@ -7,8 +7,10 @@ mod lookups;
 
 use std::collections::{BTreeMap, HashSet};
 
-use eyesight_xml::nodes::{MixVector, Node, VectorOperation};
-use eyesight_xml::schema::{Eyesight, Shader};
+use eyesight_xml::nodes::{
+    GroupReference, MixType, MixValue, MixVector, Node, NodeInput, VectorOperation,
+};
+use eyesight_xml::schema::{Eyesight, Link, Shader};
 use eyesight_xml::Named;
 use heck::{ToPascalCase, ToSnakeCase, ToTitleCase};
 
@@ -29,10 +31,16 @@ fn main() {
         implement_vector_average(shader);
     }
 
+    add_slope_roughness(&mut eyesight);
+
     let mut visited = HashSet::<&str>::new();
     let mut unvisited = vec!["Solid", "Trans Group Base"];
 
     while let Some(name) = unvisited.pop() {
+        if name == "Is Slope" {
+            // TODO: hacks like this should not be necessary
+            continue;
+        }
         let group = eyesight.groups.iter().find(|g| g.name == name).unwrap();
 
         for node in &group.shader.nodes {
@@ -53,6 +61,35 @@ fn main() {
 
     // groups::check_interfaces(&eyesight);
     // distill::distill_materials(&eyesight.materials);
+}
+
+fn add_slope_roughness(eyesight: &mut Eyesight) {
+    let normals = eyesight
+        .groups
+        .iter_mut()
+        .find(|g| g.name == "Normal")
+        .unwrap();
+
+    normals.shader.nodes.push(Node::Group(GroupReference {
+        group_name: "Is Slope".into(),
+        inputs_: vec![],
+        outputs: vec![],
+        name: "is_slope".into(),
+    }));
+    normals.shader.nodes.push(Node::MixValue(MixValue {
+        name: "choose_roughness".into(),
+        mix_type: MixType::Mix,
+        use_clamp: true,
+        inputs: vec![NodeInput::new("A", 2.0), NodeInput::new("B", 140.0)],
+    }));
+    normals
+        .shader
+        .links
+        .push(Link::new("is_slope", "0", "choose_roughness", "Factor"));
+    normals
+        .shader
+        .links
+        .push(Link::new("choose_roughness", "0", "rough_surface", "Scale"));
 }
 
 fn implement_vector_average(shader: &mut Shader) {

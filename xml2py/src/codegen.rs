@@ -105,6 +105,10 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
 
         let mut inputs = Vec::<(String, String)>::new();
 
+        for input in node.inputs_override() {
+            inputs.push((input.name.clone(), input.value.to_string()));
+        }
+
         for link in inbound_edges
             .get(&var_name)
             .map(|x| &**x)
@@ -123,10 +127,6 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
 
             let src_socket = get_socket_key(src_socket);
             inputs.push((link.to_socket.clone(), format!("{src_node}[{src_socket}]")))
-        }
-
-        for input in node.inputs_override() {
-            inputs.push((input.name.clone(), input.value.to_string()));
         }
 
         if !inputs.is_empty() {
