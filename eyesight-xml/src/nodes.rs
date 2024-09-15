@@ -691,6 +691,9 @@ struct Mix {
 
 impl INode for Mix {
     const PYTHON_TYPE: &str = "ShaderNodeMix";
+    fn inputs(&self) -> &[NodeInput] {
+        &self.inputs
+    }
     fn attributes(&self) -> Vec<(&str, String)> {
         vec![
             ("data_type", "'RGBA'".into()),
