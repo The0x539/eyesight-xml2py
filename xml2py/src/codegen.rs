@@ -24,7 +24,10 @@ pub fn the_big_kahuna(eyesight: &Eyesight, groups_to_convert: &HashSet<&str>) ->
 
         let function_body = group_to_python(group, interface);
 
-        file += &format!("def node_group_{}():\n", AsSnakeCase(&group.name));
+        file += &format!(
+            "def {}_node_group(graph: ShaderGraph):\n",
+            AsSnakeCase(&group.name)
+        );
 
         for line in function_body {
             file += "    ";
@@ -48,16 +51,6 @@ fn get_socket_key(s: &str) -> String {
 fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
     let mut lines = vec![];
 
-    let group_name = &group.name;
-    lines.extend([
-        format!("if tree := bpy.data.node_groups.get(\"{group_name}\"):"),
-        format!("    return tree"),
-        format!(""),
-        format!("tree = bpy.data.node_groups.new(\"{group_name}\", \"ShaderNodeTree\")"),
-        format!("graph = NodeGraph(tree)"),
-        format!(""),
-    ]);
-
     for (name, data_type) in &interface.inputs {
         lines.push(format!(
             "graph.input(bpy.types.{}, \"{name}\")",
@@ -80,7 +73,7 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         inbound_edges.entry(&link.to_node).or_default().push(link);
     }
 
-    let x_coordinates = (0..).step_by(100);
+    let x_coordinates = (0..).step_by(150);
     let y_coordinates = (0..).step_by(200);
 
     let node_iterator = tiers.iter().zip(x_coordinates).flat_map(|(tier, x)| {
@@ -93,11 +86,24 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         let var_name = node.name();
         let type_name = node.python_type();
 
-        lines.extend([
-            format!("{var_name} = graph.node("),
-            format!("    bpy.types.{type_name},"),
-            format!("    location=({x}, {y}),"),
-        ]);
+        let group_name = match node {
+            Node::Group(group) => Some(&*group.group_name),
+            Node::UvDegradation(_) => Some("uv_degradation"),
+            Node::ProjectToAxisPlane(_) => Some("project_to_axis_plane"),
+            _ => None,
+        };
+
+        if let Some(group_name) = group_name {
+            lines.extend([
+                format!("{var_name} = graph.group_node("),
+                format!("    {}_node_group,", AsSnakeCase(group_name)),
+            ]);
+        } else {
+            lines.extend([
+                format!("{var_name} = graph.node("),
+                format!("    bpy.types.{type_name},"),
+            ]);
+        }
 
         for (name, val) in node.attributes() {
             lines.push(format!("    {name}={val},"));
@@ -146,11 +152,10 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         }
 
         lines.push(")".into());
+        lines.push(format!("{var_name}.node.location = ({x}, {y})"));
         lines.extend(node.after());
         lines.push("".into());
     }
-
-    lines.push("return graph.tree".into());
 
     lines
 }

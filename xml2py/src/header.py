@@ -1,7 +1,9 @@
+# mypy: disable-error-code="attr-defined"
+
 import bpy
 import os.path
-from .node_dsl import NodeGraph
-from .custom_nodes import node_group_uv_degradation, node_group_project_to_axis_plane, node_group_is_slope
+from .node_dsl import ShaderGraph
+from .custom_nodes import uv_degradation_node_group, project_to_axis_plane_node_group, is_slope_node_group
 
 def load_image(filename: str | None) -> bpy.types.Image:
     assert filename != ""
@@ -11,7 +13,7 @@ def load_image(filename: str | None) -> bpy.types.Image:
 
     if filename is None:
         img = bpy.data.images.new("blank", 1, 1, alpha=True)
-        img.pixels = (0.0, 0.0, 0.0, 0.0)
+        img.pixels = (0.0, 0.0, 0.0, 0.0) # type: ignore
         img.update()
     else:
         # TODO

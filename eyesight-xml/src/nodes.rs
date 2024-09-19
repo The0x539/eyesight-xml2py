@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
-use heck::{ToShoutySnakeCase, ToSnakeCase};
-use serde::de::{Deserialize, Deserializer, Error, Unexpected};
+use heck::ToShoutySnakeCase;
+use serde::de::{Deserialize, Deserializer, Error, IgnoredAny, Unexpected};
 use serde_derive::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -331,12 +331,6 @@ struct GroupReference {
 
 impl INode for GroupReference {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
-    fn attributes(&self) -> Vec<(&str, String)> {
-        vec![(
-            "node_tree",
-            format!("node_group_{}()", self.group_name.to_snake_case()),
-        )]
-    }
     fn after(&self) -> Vec<String> {
         self.inputs_
             .iter()
@@ -559,9 +553,6 @@ struct ProjectToAxisPlane {}
 
 impl INode for ProjectToAxisPlane {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
-    fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("node_tree", "node_group_project_to_axis_plane()".to_owned())]
-    }
 }
 
 #[node]
@@ -676,9 +667,6 @@ struct UvDegradation {
 
 impl INode for UvDegradation {
     const PYTHON_TYPE: &str = "ShaderNodeGroup";
-    fn attributes(&self) -> Vec<(&str, String)> {
-        vec![("node_tree", "node_group_uv_degradation()".to_owned())]
-    }
 }
 
 #[node]
@@ -722,10 +710,14 @@ impl INode for VectorTransform {
 }
 
 #[node]
-struct TextureCoordinate {}
+struct TextureCoordinate {
+    from_dupli: Option<bool>,
+    outputs: Vec<IgnoredAny>, // from unpixelled color pack,
+}
 
 impl INode for TextureCoordinate {
     const PYTHON_TYPE: &str = "ShaderNodeTexCoord";
+    // TODO
 }
 
 #[node]
