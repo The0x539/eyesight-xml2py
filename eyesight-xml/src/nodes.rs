@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 use enum_dispatch::enum_dispatch;
+use glam::Vec4;
 use heck::ToShoutySnakeCase;
 use serde::de::{Deserialize, Deserializer, Error, IgnoredAny, Unexpected};
 use serde_derive::Deserialize;
@@ -523,16 +524,48 @@ struct RgbRamp {
 impl INode for RgbRamp {
     const PYTHON_TYPE: &str = "ShaderNodeValToRGB";
     fn after(&self) -> Vec<String> {
-        vec![format!(
-            "{}.node.color_ramp.interpolation = '{}'",
-            self.name,
-            if self.interpolate {
-                "LINEAR"
-            } else {
-                "CONSTANT"
-            }
-        )]
-        // TODO: ramps
+        let interpolation = if self.interpolate {
+            "LINEAR"
+        } else {
+            "CONSTANT"
+        };
+        let var = &self.name;
+
+        let colors = self
+            .ramp
+            .chunks_exact(3)
+            .zip(&self.ramp_alpha)
+            .map(|(rgb, a)| Vec4::new(rgb[0], rgb[1], rgb[2], *a))
+            .collect::<Vec<Vec4>>();
+
+        let elements = colors
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|&(i, color)| {
+                if i == 0 || i + 1 == colors.len() {
+                    return true;
+                }
+                let prev = colors[i - 1];
+                let next = colors[i + 1];
+                let avg = (prev + next) / 2.0;
+                !color.abs_diff_eq(avg, 0.0001)
+            })
+            .map(|(i, color)| {
+                let pos = (i as f32) / ((colors.len() - 1) as f32);
+                (pos, color.to_array())
+            })
+            .collect::<Vec<_>>();
+
+        vec![
+            format!("{var}.node.color_ramp.interpolation = '{interpolation}'"),
+            format!("original_elements = {var}.node.color_ramp.elements[:]"),
+            format!("elements = {elements:?}"),
+            format!("for pos, rgba in elements:"),
+            format!("    {var}.node.color_ramp.elements.new(pos).color = rgba"),
+            format!("for e in original_elements:"),
+            format!("    {var}.node.color_ramp.elements.remove(e)"),
+        ]
     }
 }
 
