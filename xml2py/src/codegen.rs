@@ -105,7 +105,9 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
             ]);
         }
 
+        let mut has_attributes = false;
         for (name, val) in node.attributes() {
+            has_attributes = true;
             lines.push(format!("    {name}={val},"));
         }
 
@@ -136,7 +138,11 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         }
 
         if !inputs.is_empty() {
-            lines.push("    inputs={".into());
+            if has_attributes {
+                lines.push("    inputs={".into());
+            } else {
+                lines.push("    {".into());
+            }
 
             for (dst_socket, value) in inputs {
                 let mut dst_socket = &*dst_socket;

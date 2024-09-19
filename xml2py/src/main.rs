@@ -6,6 +6,8 @@ mod codegen;
 mod lookups;
 
 use std::collections::{BTreeMap, HashSet};
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 use eyesight_xml::nodes::{
     GroupReference, MixType, MixValue, MixVector, Node, NodeInput, VectorOperation,
@@ -57,10 +59,23 @@ fn main() {
     // println!("{visited:?}");
 
     let s = codegen::the_big_kahuna(&eyesight, &visited);
-    println!("{s}");
 
-    // groups::check_interfaces(&eyesight);
-    // distill::distill_materials(&eyesight.materials);
+    let mut child = Command::new("black")
+        .args(["--skip-magic-trailing-comma", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(s.as_bytes())
+        .unwrap();
+
+    child.wait().unwrap();
 }
 
 fn add_slope_roughness(eyesight: &mut Eyesight) {
