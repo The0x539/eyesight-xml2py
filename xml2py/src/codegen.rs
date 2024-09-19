@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use heck::AsSnakeCase;
+use heck::{AsSnakeCase, ToSnakeCase};
 
 use crate::groups::Interface;
 use crate::lookups::{INPUT_ALIASES, OUTPUT_ALIASES};
-use eyesight_xml::nodes::{INode, Node};
+use eyesight_xml::nodes::{python_enum, INode, Node};
 use eyesight_xml::schema::{Eyesight, Group, Link};
 use eyesight_xml::Named;
 
@@ -86,24 +86,24 @@ fn group_to_python(group: &Group, interface: &Interface) -> Vec<String> {
         let var_name = node.name();
         let type_name = node.python_type();
 
-        let group_name = match node {
-            Node::Group(group) => Some(&*group.group_name),
-            Node::UvDegradation(_) => Some("uv_degradation"),
-            Node::ProjectToAxisPlane(_) => Some("project_to_axis_plane"),
-            _ => None,
+        let first_arg = match node {
+            Node::Group(group) => group.group_name.to_snake_case() + "_node_group",
+            Node::UvDegradation(_) => "uv_degradation_node_group".into(),
+            Node::ProjectToAxisPlane(_) => "project_to_axis_plane_node_group".into(),
+            Node::Math(math) => python_enum(math.operation),
+            _ => format!("bpy.types.{}", node.python_type()),
         };
 
-        if let Some(group_name) = group_name {
-            lines.extend([
-                format!("{var_name} = graph.group_node("),
-                format!("    {}_node_group,", AsSnakeCase(group_name)),
-            ]);
-        } else {
-            lines.extend([
-                format!("{var_name} = graph.node("),
-                format!("    bpy.types.{type_name},"),
-            ]);
-        }
+        let method_name = match node {
+            Node::Group(_) | Node::UvDegradation(_) | Node::ProjectToAxisPlane(_) => "group_node",
+            Node::Math(_) => "math_node",
+            _ => "node",
+        };
+
+        lines.extend([
+            format!("{var_name} = graph.{method_name}("),
+            format!("    {first_arg},"),
+        ]);
 
         let mut has_attributes = false;
         for (name, val) in node.attributes() {

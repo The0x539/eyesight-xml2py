@@ -31,7 +31,7 @@ pub trait INode: Named {
     }
 }
 
-fn python_enum(x: impl Debug) -> String {
+pub fn python_enum(x: impl Debug) -> String {
     // Hideous.
     format!("'{}'", format!("{x:?}").to_shouty_snake_case())
 }
@@ -471,10 +471,7 @@ impl INode for Math {
         &self.inputs
     }
     fn attributes(&self) -> Vec<(&str, String)> {
-        vec![
-            ("operation", python_enum(self.operation)),
-            ("use_clamp", python_bool(self.use_clamp)),
-        ]
+        vec![("use_clamp", python_bool(self.use_clamp))]
     }
 }
 
