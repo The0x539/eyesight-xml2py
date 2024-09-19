@@ -516,9 +516,9 @@ impl INode for Mapping {
 struct RgbRamp {
     interpolate: bool,
     #[serde(deserialize_with = "float_seq")]
-    ramp: Vec<f32>, // TODO
+    ramp: Vec<f32>,
     #[serde(deserialize_with = "float_seq")]
-    ramp_alpha: Vec<f32>, // TODO
+    ramp_alpha: Vec<f32>,
 }
 
 impl INode for RgbRamp {
