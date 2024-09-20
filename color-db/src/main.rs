@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use sqlx::{sqlite::SqliteConnectOptions, Acquire, SqlitePool};
 
@@ -49,11 +49,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "/mnt/c/program files/studio 2.0/photorealisticrenderer/win/64/settings.xml",
         "/mnt/c/program files/studio 2.0/data/customcolors/customcolorsettings.xml",
     ];
-    let eyesight_names = ["eyesight"];
+    let eyesight_names = ["eyesight", "custom", "unpixelled"];
     for (name, path) in eyesight_names.iter().zip(eyesight_paths) {
         let definitions = std::fs::read_to_string(path)?;
         eyesight::insert_file(&definitions, name, &mut *conn).await?;
     }
+
+    let rows = sqlx::query!("SELECT * FROM eyesight_color")
+        .fetch_all(&mut *conn)
+        .await?;
+    let mut map = HashMap::new();
+    for row in rows {
+        map.insert(row.name, (row.red, row.green, row.blue));
+    }
+
+    let rows =
+        sqlx::query!("SELECT distinct ldraw_code, studio_name, category_name FROM studio_color")
+            .fetch_all(&mut *conn)
+            .await?;
+
+    println!("colors = {{");
+    for row in rows {
+        if matches!(&*row.studio_name, "CurrentColor" | "EdgeColor") {
+            continue;
+        }
+
+        let prefix = match &*row.category_name {
+            "Solid Colors" => "SOLID-",
+            "Transparent Colors" => "TRANS-",
+            _ => continue,
+        };
+
+        let mut name = row
+            .studio_name
+            .replace("-", "_")
+            .replace(" ", "_")
+            .to_uppercase();
+
+        name.insert_str(0, prefix);
+
+        name = name.replace("TRANS-TRANS_", "TRANS-");
+
+        let Some(rgb) = map.get(&name) else {
+            println!("    # {name}");
+            continue;
+        };
+
+        let id = row.ldraw_code;
+
+        println!("    {id}: {rgb:?},");
+    }
+    println!("}}");
 
     Ok(())
 }

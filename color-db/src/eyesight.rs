@@ -2,7 +2,8 @@ use sqlx::SqliteConnection;
 
 use eyesight_xml::{
     nodes::{Node, Vec3},
-    schema::{Eyesight, Material, Named},
+    schema::{Eyesight, Material},
+    Named,
 };
 
 pub async fn insert_file(
