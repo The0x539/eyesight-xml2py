@@ -699,6 +699,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighting"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "quick-xml",
+ "serde",
+ "serde_derive",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,3 +1,3 @@
 [workspace]
-members = ["color-db", "eyesight-xml", "xml2py", "xml2py-macros"]
+members = ["color-db", "eyesight-xml", "lighting", "xml2py", "xml2py-macros"]
 resolver = "2"
